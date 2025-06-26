@@ -2,7 +2,6 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react(),
@@ -36,4 +35,25 @@ export default defineConfig({
       }
     })
   ],
+  build: {
+    chunkSizeWarningLimit: 1000,  // Coloque aqui, no nível do build
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react')) {
+              return 'vendor_react'
+            }
+            if (id.includes('recharts')) {
+              return 'vendor_recharts'
+            }
+            if (id.includes('jspdf')) {
+              return 'vendor_jspdf'
+            }
+            return 'vendor_other'
+          }
+        }
+      }
+    }
+  }
 })
