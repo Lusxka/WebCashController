@@ -1,1 +1,3 @@
-"build": "vite build"
+"scripts": {
+  "build": "vite build"
+}
