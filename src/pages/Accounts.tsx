@@ -42,10 +42,16 @@ const Accounts: React.FC = () => {
     }
 
     if (editingAccount) {
-      updateAccount(editingAccount, formData)
+      updateAccount(editingAccount, {
+        ...formData,
+        isActive: true // adiciona para evitar erro de tipo
+      })
       setEditingAccount(null)
     } else {
-      addAccount(formData)
+      addAccount({
+        ...formData,
+        isActive: true // adicionado para resolver erro TS2345
+      })
     }
 
     setFormData({

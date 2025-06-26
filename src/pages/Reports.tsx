@@ -14,6 +14,13 @@ import {
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
 
+// Corrigindo erro de autoTable no TypeScript
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => jsPDF
+  }
+}
+
 const Reports: React.FC = () => {
   const { transactions, categories, accounts } = useFinance()
   const [selectedPeriod, setSelectedPeriod] = useState('current-month')
