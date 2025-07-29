@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import path from 'path' // 👈 ADICIONE ESTA LINHA
 
 export default defineConfig({
   plugins: [
@@ -35,8 +36,16 @@ export default defineConfig({
       }
     })
   ],
+
+  // 👈 ADICIONE ESTA SEÇÃO INTEIRA PARA RESOLVER O PROBLEMA
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+
   build: {
-    chunkSizeWarningLimit: 1000,  // Coloque aqui, no nível do build
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks(id) {
