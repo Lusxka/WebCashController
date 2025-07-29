@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useFinance } from '../contexts/FinanceContext'
+import { Account } from '../types'
 import { 
   Plus, 
   Edit2, 
@@ -7,131 +8,115 @@ import {
   Wallet,
   CreditCard,
   Banknote,
-  Building2
+  Building2,
+  Loader2,
+  AlertCircle
 } from 'lucide-react'
 
-const Accounts: React.FC = () => {
-  const { accounts, addAccount, updateAccount, deleteAccount } = useFinance()
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [editingAccount, setEditingAccount] = useState<string | null>(null)
+type AccountFormData = {
+  name: string;
+  type: Account['type'];
+  color: string;
+}
 
-  const [formData, setFormData] = useState({
-    name: '',
-    type: 'bank' as 'bank' | 'wallet' | 'cash' | 'credit_card',
-    color: '#3B82F6'
-  })
+const Accounts: React.FC = () => {
+  const { accounts, addAccount, updateAccount, deleteAccount, isFinanceLoading, financeError } = useFinance()
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+
+  const initialFormState: AccountFormData = { name: '', type: 'bank', color: '#3B82F6' }
+  const [formData, setFormData] = useState<AccountFormData>(initialFormState)
+
+  useEffect(() => {
+    if (showAddModal) {
+      if (editingAccount) {
+        setFormData({ name: editingAccount.name, type: editingAccount.type, color: editingAccount.color });
+      } else {
+        setFormData(initialFormState);
+      }
+    }
+  }, [showAddModal, editingAccount]);
 
   const accountTypes = [
-    { value: 'bank', label: 'Conta Bancária', icon: Building2 },
-    { value: 'wallet', label: 'Carteira Digital', icon: Wallet },
-    { value: 'cash', label: 'Dinheiro', icon: Banknote },
-    { value: 'credit_card', label: 'Cartão de Crédito', icon: CreditCard }
-  ]
+    { value: 'bank' as const, label: 'Conta Bancária', icon: Building2 },
+    { value: 'wallet' as const, label: 'Carteira Digital', icon: Wallet },
+    { value: 'cash' as const, label: 'Dinheiro', icon: Banknote },
+    { value: 'credit_card' as const, label: 'Cartão de Crédito', icon: CreditCard }
+  ];
+  const colors = ['#3B82F6', '#059669', '#DC2626', '#7C3AED', '#EA580C', '#0891B2', '#BE185D', '#65A30D'];
 
-  const colors = [
-    '#3B82F6', '#059669', '#DC2626', '#7C3AED', 
-    '#EA580C', '#0891B2', '#BE185D', '#65A30D'
-  ]
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name.trim()) return;
     
-    if (!formData.name.trim()) {
-      alert('Por favor, insira o nome da conta')
-      return
-    }
+    setIsSubmitting(true);
+    setFormError(null);
+    
+    const success = editingAccount 
+      ? await updateAccount(editingAccount.id, formData)
+      : await addAccount({ ...formData, isActive: true });
 
-    if (editingAccount) {
-      updateAccount(editingAccount, {
-        ...formData,
-        isActive: true // adiciona para evitar erro de tipo
-      })
-      setEditingAccount(null)
+    setIsSubmitting(false);
+    if (success) {
+      resetForm();
     } else {
-      addAccount({
-        ...formData,
-        isActive: true // adicionado para resolver erro TS2345
-      })
+      setFormError("Não foi possível salvar a conta. Verifique a consola do navegador (F12) para mais detalhes.");
     }
-
-    setFormData({
-      name: '',
-      type: 'bank',
-      color: '#3B82F6'
-    })
-    setShowAddModal(false)
   }
 
-  const handleEdit = (account: any) => {
-    setFormData({
-      name: account.name,
-      type: account.type,
-      color: account.color
-    })
-    setEditingAccount(account.id)
-    setShowAddModal(true)
+  const handleEdit = (account: Account) => {
+    setEditingAccount(account);
+    setShowAddModal(true);
   }
 
   const handleDelete = (id: string) => {
-    if (confirm('Tem certeza que deseja excluir esta conta? Todas as transações relacionadas também serão removidas.')) {
-      deleteAccount(id)
+    if (confirm('Tem certeza que deseja excluir esta conta?')) {
+      deleteAccount(id);
     }
   }
 
   const resetForm = () => {
-    setFormData({
-      name: '',
-      type: 'bank',
-      color: '#3B82F6'
-    })
-    setEditingAccount(null)
-    setShowAddModal(false)
+    setShowAddModal(false);
+    setEditingAccount(null);
+    setFormError(null);
   }
 
-  const getAccountIcon = (type: string) => {
-    const accountType = accountTypes.find(t => t.value === type)
-    const Icon = accountType?.icon || Wallet
-    return Icon
+  const getAccountIcon = (type: Account['type']) => accountTypes.find(t => t.value === type)?.icon || Wallet;
+  const getAccountTypeLabel = (type: Account['type']) => accountTypes.find(t => t.value === type)?.label || 'Conta';
+  const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
+
+  if (isFinanceLoading) {
+    return (
+        <div className="flex justify-center items-center h-full p-8">
+            <Loader2 className="w-16 h-16 animate-spin text-primary-600" />
+        </div>
+    );
   }
 
-  const getAccountTypeLabel = (type: string) => {
-    return accountTypes.find(t => t.value === type)?.label || 'Conta'
+  if (financeError) {
+    return <div className="p-4 bg-red-100 text-red-700 rounded-md">Ocorreu um erro ao buscar os dados: {financeError}</div>;
   }
-
-  const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0)
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Contas
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Gerencie suas contas e carteiras
-          </p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Contas</h1>
+          <p className="text-gray-600 dark:text-gray-400">Gerencie suas contas e carteiras</p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="btn-primary flex items-center gap-2"
-        >
-          <Plus className="w-5 h-5" />
-          Nova Conta
+        <button onClick={() => setShowAddModal(true)} className="btn-primary flex items-center gap-2">
+          <Plus size={18} /> Nova Conta
         </button>
       </div>
 
-      {/* Total Balance Card */}
       <div className="card bg-gradient-to-r from-primary-600 to-primary-700 text-white">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-primary-100 mb-1">Saldo Total</p>
-            <p className="text-3xl font-bold">
-              R$ {totalBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-            <p className="text-primary-200 text-sm mt-1">
-              {accounts.length} conta{accounts.length !== 1 ? 's' : ''} ativa{accounts.length !== 1 ? 's' : ''}
-            </p>
+            <p className="text-3xl font-bold">R$ {totalBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+            <p className="text-primary-200 text-sm mt-1">{accounts.length} conta{accounts.length !== 1 ? 's' : ''}</p>
           </div>
           <div className="p-4 bg-white bg-opacity-20 rounded-full">
             <Wallet className="w-8 h-8" />
@@ -139,170 +124,77 @@ const Accounts: React.FC = () => {
         </div>
       </div>
 
-      {/* Accounts Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {accounts.map(account => {
-          const Icon = getAccountIcon(account.type)
-          
+          const Icon = getAccountIcon(account.type);
           return (
             <div key={account.id} className="card hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between mb-4">
-                <div 
-                  className="w-12 h-12 rounded-full flex items-center justify-center text-white"
-                  style={{ backgroundColor: account.color }}
-                >
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-white" style={{ backgroundColor: account.color }}>
                   <Icon className="w-6 h-6" />
                 </div>
                 <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleEdit(account)}
-                    className="p-2 text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(account.id)}
-                    className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <button onClick={() => handleEdit(account)} className="p-2 text-gray-400 hover:text-primary-600 dark:hover:text-primary-400"><Edit2 size={16} /></button>
+                  <button onClick={() => handleDelete(account.id)} className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400"><Trash2 size={16} /></button>
                 </div>
               </div>
-              
               <div>
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-                  {account.name}
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                  {getAccountTypeLabel(account.type)}
-                </p>
-                <p className={`text-xl font-bold ${
-                  account.balance >= 0 
-                    ? 'text-secondary-600 dark:text-secondary-400' 
-                    : 'text-red-600 dark:text-red-400'
-                }`}>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{account.name}</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{getAccountTypeLabel(account.type)}</p>
+                <p className={`text-xl font-bold ${account.balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                   R$ {account.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
-              
-              {!account.isActive && (
-                <div className="mt-3 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs text-gray-600 dark:text-gray-400 text-center">
-                  Conta Inativa
-                </div>
-              )}
             </div>
           )
         })}
-        
         {accounts.length === 0 && (
           <div className="col-span-full text-center py-12">
-            <div className="text-gray-400 mb-4">
-              <Wallet className="w-12 h-12 mx-auto" />
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              Nenhuma conta encontrada
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Comece adicionando sua primeira conta para gerenciar suas finanças
-            </p>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="btn-primary"
-            >
-              Adicionar Primeira Conta
-            </button>
+            <div className="text-gray-400 mb-4"><Wallet className="w-12 h-12 mx-auto" /></div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Nenhuma conta encontrada</h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">Comece adicionando sua primeira conta</p>
+            <button onClick={() => setShowAddModal(true)} className="btn-primary">Adicionar Primeira Conta</button>
           </div>
         )}
       </div>
 
-      {/* Add/Edit Account Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md">
             <div className="p-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
-                {editingAccount ? 'Editar Conta' : 'Nova Conta'}
-              </h2>
-              
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">{editingAccount ? 'Editar Conta' : 'Nova Conta'}</h2>
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Name */}
+                {formError && (<div className="p-3 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-md flex items-center gap-2 text-sm"><AlertCircle size={16} /><span>{formError}</span></div>)}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Nome da Conta *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="input-field"
-                    placeholder="Ex: Conta Corrente, Nubank..."
-                    required
-                  />
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome da Conta *</label>
+                  <input type="text" value={formData.name} onChange={(e) => setFormData(f => ({ ...f, name: e.target.value }))} className="input-field" required disabled={isSubmitting} />
                 </div>
-
-                {/* Type */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Tipo de Conta
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {accountTypes.map(type => {
-                      const Icon = type.icon
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo de Conta</label>
+                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {accountTypes.map(typeInfo => {
+                      const Icon = typeInfo.icon
                       return (
-                        <button
-                          key={type.value}
-                          type="button"
-                          onClick={() => setFormData({ ...formData, type: type.value as any })}
-                          className={`p-3 rounded-lg border-2 transition-colors flex flex-col items-center gap-2 ${
-                            formData.type === type.value
-                              ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
-                              : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                          }`}
-                        >
-                          <Icon className="w-6 h-6" />
-                          <span className="text-xs font-medium">{type.label}</span>
+                        <button key={typeInfo.value} type="button" onClick={() => setFormData(f => ({ ...f, type: typeInfo.value }))} disabled={isSubmitting} className={`p-3 rounded-lg border-2 flex flex-col items-center justify-center gap-2 transition-colors text-center ${formData.type === typeInfo.value ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/30' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}>
+                          <Icon className={`w-6 h-6 mb-1 ${formData.type === typeInfo.value ? 'text-primary-600 dark:text-primary-400' : 'text-gray-600 dark:text-gray-300'}`} />
+                          <span className={`text-xs font-medium ${formData.type === typeInfo.value ? 'text-primary-700 dark:text-primary-300' : 'text-gray-700 dark:text-gray-200'}`}>{typeInfo.label}</span>
                         </button>
                       )
                     })}
                   </div>
                 </div>
-
-                {/* Color */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Cor
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cor</label>
                   <div className="flex gap-2 flex-wrap">
                     {colors.map(color => (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, color })}
-                        className={`w-10 h-10 rounded-full border-2 transition-all ${
-                          formData.color === color
-                            ? 'border-gray-400 dark:border-gray-300 scale-110'
-                            : 'border-gray-200 dark:border-gray-600 hover:scale-105'
-                        }`}
-                        style={{ backgroundColor: color }}
-                      />
+                      <button key={color} type="button" onClick={() => setFormData(f => ({ ...f, color }))} disabled={isSubmitting} className={`w-8 h-8 rounded-full border-2 transition-all ${formData.color === color ? 'border-primary-500 scale-110 shadow-lg' : 'border-transparent hover:scale-105'}`} style={{ backgroundColor: color }} />
                     ))}
                   </div>
                 </div>
-
-                {/* Buttons */}
                 <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="flex-1 btn-secondary"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 btn-primary"
-                  >
-                    {editingAccount ? 'Salvar' : 'Criar Conta'}
+                  <button type="button" onClick={resetForm} className="btn-secondary flex-1" disabled={isSubmitting}>Cancelar</button>
+                  <button type="submit" className="btn-primary flex-1 flex justify-center items-center gap-2" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="animate-spin" /> : (editingAccount ? 'Salvar' : 'Criar Conta')}
                   </button>
                 </div>
               </form>
@@ -314,4 +206,4 @@ const Accounts: React.FC = () => {
   )
 }
 
-export default Accounts
+export default Accounts;

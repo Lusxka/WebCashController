@@ -8,23 +8,18 @@ const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
 export const useFinance = () => {
   const context = useContext(FinanceContext);
-  if (context === undefined) {
-    throw new Error('useFinance deve ser usado dentro de um FinanceProvider');
-  }
+  if (!context) throw new Error('useFinance must be used within a FinanceProvider');
   return context;
 };
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
 
-  // Estados para todos os dados financeiros
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
-
-  // Estados de carregamento e erro para os dados financeiros
   const [isFinanceLoading, setIsFinanceLoading] = useState(true);
   const [financeError, setFinanceError] = useState<string | null>(null);
 
@@ -55,17 +50,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (goalsRes.error) throw goalsRes.error;
         if (budgRes.error) throw budgRes.error;
 
-        // Adaptação dos nomes de colunas do DB para as propriedades do frontend
-        const adaptedAccounts = (accRes.data || []).map(a => ({ ...a, balance: a.saldo_inicial || 0, type: a.tipo, isActive: true, updatedAt: a.created_at }) as Account);
+        const adaptedAccounts = (accRes.data || []).map(dbAccount => ({ id: dbAccount.id, name: dbAccount.nome, type: dbAccount.tipo, balance: dbAccount.saldo_inicial || 0, color: dbAccount.cor, isActive: true, createdAt: dbAccount.created_at, updatedAt: dbAccount.created_at }) as Account);
         const adaptedCategories = (catRes.data || []).map(c => ({...c, isActive: true, icon: c.icone}) as Category);
-        const adaptedDespesas = (despRes.data || []).map(t => ({...t, type: 'expense', amount: t.valor, accountId: t.conta_id, recurrence: 'none', updatedAt: t.created_at}) as Transaction);
-        const adaptedReceitas = (recRes.data || []).map(t => ({...t, type: 'income', amount: t.valor, accountId: t.conta_id, recurrence: 'none', updatedAt: t.created_at}) as Transaction);
-        const adaptedGoals = (goalsRes.data || []).map(g => ({...g, targetAmount: g.valor_alvo, currentAmount: g.valor_atual, targetDate: g.data_alvo, isCompleted: false}) as Goal);
-        const adaptedBudgets = (budgRes.data || []).map(b => ({...b, categoryId: b.categoria_id, amount: b.valor, spent: 0, alertThreshold: 0.8}) as Budget);
+        const adaptedGoals = (goalsRes.data || []).map(g => ({...g, targetAmount: g.valor_alvo, currentAmount: g.valor_atual, targetDate: g.data_alvo, isCompleted: false, createdAt: g.created_at}) as Goal);
+        const adaptedBudgets = (budgRes.data || []).map(b => ({...b, categoryId: b.categoria_id, amount: b.valor, spent: 0, alertThreshold: 0.8, createdAt: b.created_at}) as Budget);
         
+        const adaptedDespesas = (despRes.data || []).map(t => ({...t, type: 'expense', amount: t.valor, accountId: t.conta_id, category: t.categoria_id, recurrence: 'none', updatedAt: t.created_at, createdAt: t.created_at, description: t.descricao}) as Transaction);
+        const adaptedReceitas = (recRes.data || []).map(t => ({...t, type: 'income', amount: t.valor, accountId: t.conta_id, category: t.categoria_id, recurrence: 'none', updatedAt: t.created_at, createdAt: t.created_at, description: t.descricao}) as Transaction);
+        
+        setTransactions([...adaptedDespesas, ...adaptedReceitas]);
         setAccounts(adaptedAccounts);
         setCategories(adaptedCategories);
-        setTransactions([...adaptedDespesas, ...adaptedReceitas]);
         setGoals(adaptedGoals);
         setBudgets(adaptedBudgets);
 
@@ -80,34 +75,95 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     fetchData();
   }, [user]);
   
+  const addAccount = async (account: Omit<Account, 'id' | 'balance' | 'createdAt' | 'updatedAt'>): Promise<boolean> => {
+    if (!user) return false;
+    try {
+      const { data: dbRecord, error } = await supabase.from('contas').insert({
+        nome: account.name,
+        tipo: account.type,
+        cor: account.color,
+        saldo_inicial: 0,
+        usuario_id: user.id
+      }).select().single();
+
+      if (error) throw error;
+      
+      // AQUI ESTÁ A CORREÇÃO: Mapeamento manual dos campos
+      const newAccount: Account = {
+        id: dbRecord.id,
+        name: dbRecord.nome, // Traduz 'nome' para 'name'
+        type: dbRecord.tipo,
+        balance: dbRecord.saldo_inicial,
+        color: dbRecord.cor,
+        isActive: true,
+        createdAt: dbRecord.created_at,
+        updatedAt: dbRecord.created_at,
+      };
+
+      setAccounts(prev => [...prev, newAccount].sort((a, b) => a.name.localeCompare(b.name)));
+      return true;
+    } catch (error: any) {
+      console.error("Erro detalhado ao adicionar conta:", error.message);
+      return false;
+    }
+  };
+
+  const updateAccount = async (id: string, updatedFields: Partial<Account>): Promise<boolean> => {
+    if (!user) return false;
+    try {
+      const { data: dbRecord, error } = await supabase.from('contas').update({
+        nome: updatedFields.name,
+        tipo: updatedFields.type,
+        cor: updatedFields.color,
+      }).eq('id', id).select().single();
+
+      if (error) throw error;
+
+      // AQUI ESTÁ A CORREÇÃO: Mapeamento manual dos campos
+      const updatedAccount: Account = {
+        id: dbRecord.id,
+        name: dbRecord.nome,
+        type: dbRecord.tipo,
+        balance: dbRecord.saldo_inicial,
+        color: dbRecord.cor,
+        isActive: true,
+        createdAt: dbRecord.created_at,
+        updatedAt: dbRecord.created_at,
+      };
+
+      setAccounts(prev => prev.map(acc => acc.id === id ? updatedAccount : acc).sort((a, b) => a.name.localeCompare(b.name)));
+      return true;
+    } catch(error: any) {
+      console.error("Erro detalhado ao atualizar conta:", error.message);
+      return false;
+    }
+  };
+
+  const deleteAccount = async (id: string): Promise<boolean> => {
+    if(!user) return false;
+    try {
+      const { error } = await supabase.from('contas').delete().match({ id });
+      if (error) throw error;
+      setAccounts(prev => prev.filter(acc => acc.id !== id));
+      return true;
+    } catch(error: any) {
+      console.error("Erro detalhado ao apagar conta:", error.message);
+      return false;
+    }
+  };
+  
   const getTotalBalance = useCallback(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
   const getMonthlyIncome = useCallback((month = format(new Date(), 'yyyy-MM')) => transactions.filter(t => t.type === 'income' && t.date.startsWith(month)).reduce((sum, t) => sum + t.amount, 0), [transactions]);
   const getMonthlyExpenses = useCallback((month = format(new Date(), 'yyyy-MM')) => transactions.filter(t => t.type === 'expense' && t.date.startsWith(month)).reduce((sum, t) => sum + t.amount, 0), [transactions]);
-  const addAccount = async (account: Omit<Account, 'id' | 'balance' | 'createdAt' | 'updatedAt'>) => { /* ... */ };
 
-  // AQUI ESTÁ A CORREÇÃO PRINCIPAL
   const value: FinanceContextType = {
-    accounts,
-    categories,
-    transactions,
-    goals,
-    budgets,
-    currentUser: user,
-    isFinanceLoading,   // <-- Adicionado para corrigir o erro
-    financeError,       // <-- Adicionado para corrigir o erro
-    
-    // Funções
-    getTotalBalance,
-    getMonthlyIncome,
-    getMonthlyExpenses,
-    addAccount,
-    
-    // Funções placeholder para o resto da interface
-    updateAccount: () => console.warn('updateAccount não implementado'),
-    deleteAccount: () => console.warn('deleteAccount não implementado'),
-    addTransaction: () => console.warn('addTransaction não implementado'),
+    transactions, accounts, categories, budgets, goals, currentUser: user, isFinanceLoading, financeError,
+    addTransaction: () => { console.warn('addTransaction não implementado'); return Promise.resolve() as unknown as void; },
     updateTransaction: () => console.warn('updateTransaction não implementado'),
     deleteTransaction: () => console.warn('deleteTransaction não implementado'),
+    addAccount,
+    updateAccount,
+    deleteAccount,
     addCategory: () => console.warn('addCategory não implementado'),
     updateCategory: () => console.warn('updateCategory não implementado'),
     deleteCategory: () => console.warn('deleteCategory não implementado'),
@@ -117,11 +173,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     addGoal: () => console.warn('addGoal não implementado'),
     updateGoal: () => console.warn('updateGoal não implementado'),
     deleteGoal: () => console.warn('deleteGoal não implementado'),
+    getTotalBalance,
+    getMonthlyIncome,
+    getMonthlyExpenses,
     getCategorySpending: () => 0,
   };
 
-  // O Provider SEMPRE renderiza os filhos, delegando o controlo do UI de carregamento
-  // para os componentes que consomem o contexto (como o Dashboard).
   return (
     <FinanceContext.Provider value={value}>
       {children}
