@@ -53,10 +53,10 @@ export interface Goal {
 }
 
 export interface User {
-  id: string
+  id:string
   name: string
   email: string
-  role: 'admin' | 'editor' | 'viewer'
+  role: 'admin' | 'editor' | 'viewer' | 'user'
   createdAt: string
 }
 
@@ -67,33 +67,25 @@ export interface FinanceContextType {
   budgets: Budget[]
   goals: Goal[]
   currentUser: User | null
+  isFinanceLoading: boolean
+  financeError: string | null
   
-  // Transaction methods
+  // Métodos
   addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => void
   updateTransaction: (id: string, transaction: Partial<Transaction>) => void
   deleteTransaction: (id: string) => void
-  
-  // Account methods
   addAccount: (account: Omit<Account, 'id' | 'balance' | 'createdAt' | 'updatedAt'>) => void
   updateAccount: (id: string, account: Partial<Account>) => void
   deleteAccount: (id: string) => void
-  
-  // Category methods
   addCategory: (category: Omit<Category, 'id'>) => void
   updateCategory: (id: string, category: Partial<Category>) => void
   deleteCategory: (id: string) => void
-  
-  // Budget methods
   addBudget: (budget: Omit<Budget, 'id' | 'spent' | 'createdAt'>) => void
   updateBudget: (id: string, budget: Partial<Budget>) => void
   deleteBudget: (id: string) => void
-  
-  // Goal methods
   addGoal: (goal: Omit<Goal, 'id' | 'currentAmount' | 'isCompleted' | 'createdAt'>) => void
   updateGoal: (id: string, goal: Partial<Goal>) => void
   deleteGoal: (id: string) => void
-  
-  // Utility methods
   getTotalBalance: () => number
   getMonthlyIncome: (month?: string) => number
   getMonthlyExpenses: (month?: string) => number

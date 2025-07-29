@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "target": "ESNext",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Node",
     "jsx": "react-jsx",
@@ -8,7 +9,14 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "outDir": "dist",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+
+    /* Adicionado para corrigir o erro 'import.meta.env' */
+    "types": ["vite/client"],
+
+    /* Aliases */
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
