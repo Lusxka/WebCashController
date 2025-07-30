@@ -75,8 +75,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     fetchData();
   }, [user]);
   
-  // --- Funções CRUD ---
-
   const addTransaction = async (transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>): Promise<boolean> => {
     if (!user) return false;
     const table = transaction.type === 'income' ? 'receitas' : 'despesas';
@@ -90,7 +88,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return true;
     } catch (error: any) { console.error("Erro ao adicionar transação:", error.message); return false; }
   };
-
+  
   const deleteTransaction = async (id: string): Promise<boolean> => {
     if (!user) return false;
     const transactionToDelete = transactions.find(t => t.id === id);
@@ -105,13 +103,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return true;
     } catch (error: any) { console.error("Erro ao apagar transação:", error.message); return false; }
   };
-  
+
   const addAccount = async (account: Omit<Account, 'id' | 'balance' | 'createdAt' | 'updatedAt'>): Promise<boolean> => {
     if (!user) return false;
     try {
       const { data: dbRecord, error } = await supabase.from('contas').insert({ nome: account.name, tipo: account.type, cor: account.color, saldo_inicial: 0, usuario_id: user.id }).select().single();
       if (error) throw error;
-      const newAccount: Account = { id: dbRecord.id, name: dbRecord.nome, type: dbRecord.tipo, balance: dbRecord.saldo_inicial, color: dbRecord.cor, isActive: true, createdAt: dbRecord.created_at, updatedAt: dbRecord.created_at, };
+      const newAccount: Account = { id: dbRecord.id, name: dbRecord.nome, type: dbRecord.tipo, balance: dbRecord.saldo_inicial, color: dbRecord.cor, isActive: true, createdAt: dbRecord.created_at, updatedAt: dbRecord.created_at };
       setAccounts(prev => [...prev, newAccount].sort((a, b) => a.name.localeCompare(b.name)));
       return true;
     } catch (error: any) { console.error("Erro detalhado ao adicionar conta:", error.message); return false; }
@@ -122,7 +120,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const { data: dbRecord, error } = await supabase.from('contas').update({ nome: updatedFields.name, tipo: updatedFields.type, cor: updatedFields.color }).eq('id', id).select().single();
       if (error) throw error;
-      const updatedAccount: Account = { id: dbRecord.id, name: dbRecord.nome, type: dbRecord.tipo, balance: dbRecord.saldo_inicial, color: dbRecord.cor, isActive: true, createdAt: dbRecord.created_at, updatedAt: dbRecord.created_at, };
+      const updatedAccount: Account = { id: dbRecord.id, name: dbRecord.nome, type: dbRecord.tipo, balance: dbRecord.saldo_inicial, color: dbRecord.cor, isActive: true, createdAt: dbRecord.created_at, updatedAt: dbRecord.created_at };
       setAccounts(prev => prev.map(acc => acc.id === id ? updatedAccount : acc).sort((a, b) => a.name.localeCompare(b.name)));
       return true;
     } catch(error: any) { console.error("Erro detalhado ao atualizar conta:", error.message); return false; }
@@ -137,7 +135,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return true;
     } catch(error: any) { console.error("Erro detalhado ao apagar conta:", error.message); return false; }
   };
-  
+
   const addCategory = async (category: Omit<Category, 'id' | 'isActive'>): Promise<boolean> => {
     if (!user) return false;
     try {
@@ -169,7 +167,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return true;
     } catch (error: any) { console.error("Erro ao apagar categoria:", error.message); return false; }
   };
-
+  
   const getTotalBalance = useCallback(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
   const getMonthlyIncome = useCallback((month = format(new Date(), 'yyyy-MM')) => transactions.filter(t => t.date && t.type === 'income' && t.date.startsWith(month)).reduce((sum, t) => sum + t.amount, 0), [transactions]);
   const getMonthlyExpenses = useCallback((month = format(new Date(), 'yyyy-MM')) => transactions.filter(t => t.date && t.type === 'expense' && t.date.startsWith(month)).reduce((sum, t) => sum + t.amount, 0), [transactions]);
