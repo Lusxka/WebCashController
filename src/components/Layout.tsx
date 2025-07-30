@@ -1,6 +1,6 @@
-import React from 'react'
-import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
+import React, { useMemo } from 'react'; // 1. Adicionado useMemo
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   Home, 
   CreditCard, 
@@ -11,77 +11,84 @@ import {
   LogOut,
   User,
   Tag
-} from 'lucide-react'
+} from 'lucide-react';
 
 interface LayoutProps {
-  children: React.ReactNode
+  children: React.ReactNode;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const location = useLocation()
-  const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
-  // CORREÇÃO: Removido 'Config' da barra de navegação principal
   const navItems = [
     { path: '/', icon: Home, label: 'Início' },
     { path: '/transacoes', icon: CreditCard, label: 'Transações' },
     { path: '/contas', icon: Wallet, label: 'Contas' },
     { path: '/categorias', icon: Tag, label: 'Categorias' },
     { path: '/relatorios', icon: BarChart3, label: 'Relatórios' },
-  ]
+  ];
   
-  // Item de Configurações separado para uso no desktop e mobile
-  const settingsItem = { path: '/configuracoes', icon: Settings, label: 'Config' }
+  const settingsItem = { path: '/configuracoes', icon: Settings, label: 'Config' };
+
+  // <-- LÓGICA ADICIONADA PARA ABREVIAR O NOME -->
+  const abbreviatedUserName = useMemo(() => {
+    const fullName = user?.name;
+    if (!fullName) return '';
+    
+    const parts = fullName.trim().split(' ').filter(p => p); // Remove espaços em branco extras
+    
+    if (parts.length > 1) {
+      return `${parts[0]} ${parts[parts.length - 1]}`;
+    }
+    
+    return fullName;
+  }, [user?.name]);
 
   const handleLogout = () => {
     if (confirm('Tem certeza que deseja sair?')) {
-      logout()
+      logout();
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20 lg:pb-0">
-      {/* Header -- CORREÇÃO: Fixo no topo com 'sticky' e 'z-50' */}
       <header className="sticky top-0 z-50 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             
-            {/* Logo */}
             <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <h1 className="text-xl font-bold text-primary-600 dark:text-primary-400">
-                  WebCash
-                </h1>
-              </div>
+              <h1 className="text-xl font-bold text-primary-600 dark:text-primary-400">WebCash</h1>
             </div>
             
-            {/* Navegação do Desktop (Centro) */}
             <nav className="hidden lg:flex space-x-4">
-              {[...navItems, settingsItem].map((item) => { // Adiciona 'Config' no desktop
-                const Icon = item.icon
+              {[...navItems, settingsItem].map((item) => {
+                const Icon = item.icon;
                 return (
-                  <NavLink key={item.path} to={item.path} className={({ isActive }) => `flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${ isActive ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
+                  <NavLink key={item.path} to={item.path} className={({ isActive }) => `flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${ isActive ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' }`}>
                     <Icon className="w-5 h-5 mr-2" />
                     {item.label}
                   </NavLink>
-                )
+                );
               })}
             </nav>
 
-            {/* Menu do Utilizador (Direita) */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
                   <User className="w-4 h-4 text-white" />
                 </div>
                 <div className="text-sm hidden sm:block">
-                  <p className="font-medium text-gray-900 dark:text-white truncate">{user?.name}</p>
-                  <p className="text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
+                  <p className="font-medium text-gray-900 dark:text-white truncate">
+                    {abbreviatedUserName} {/* <-- NOME ABREVIADO USADO AQUI */}
+                  </p>
+                  <p className="text-gray-500 dark:text-gray-400 truncate">
+                    {user?.email}
+                  </p>
                 </div>
               </div>
               
-              {/* CORREÇÃO: Ícone de Configurações para Mobile */}
               <button onClick={() => navigate('/configuracoes')} className="lg:hidden p-2 text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400">
                 <Settings className="w-5 h-5" />
               </button>
@@ -94,36 +101,30 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </header>
 
-      {/* Conteúdo Principal */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {children}
       </main>
 
-      {/* Navegação Mobile Inferior (agora sem o item 'Config') */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
         <div className="flex justify-around items-center h-16">
           {navItems.map((item) => {
-            const Icon = item.icon
-            const isActive = location.pathname === item.path
+            const Icon = item.icon;
+            const isActive = location.pathname === item.path;
             return (
               <NavLink key={item.path} to={item.path} className={`flex flex-col items-center justify-center w-full h-full transition-colors ${ isActive ? 'text-primary-600 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400'}`}>
                 <Icon className="w-6 h-6" />
                 <span className="text-xs mt-1 font-medium">{item.label}</span>
               </NavLink>
-            )
+            );
           })}
         </div>
       </nav>
 
-      {/* CORREÇÃO: Botão de Ação Flutuante agora respeita a barra de navegação */}
-       <button 
-          onClick={() => alert('Ação Rápida!')}
-          className="lg:hidden fixed bottom-20 right-6 w-14 h-14 bg-primary-600 hover:bg-primary-700 text-white rounded-full shadow-lg flex items-center justify-center transition-transform duration-200 hover:scale-110 active:scale-95"
-        >
+      <button onClick={() => alert('Ação Rápida!')} className="lg:hidden fixed bottom-20 right-6 w-14 h-14 bg-primary-600 hover:bg-primary-700 text-white rounded-full shadow-lg flex items-center justify-center transition-transform duration-200 hover:scale-110 active:scale-95">
         <Plus className="w-6 h-6" />
       </button>
     </div>
-  )
-}
+  );
+};
 
 export default Layout;
