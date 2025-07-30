@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { useFinance } from '../contexts/FinanceContext'
 import { format, startOfMonth, endOfMonth, subMonths, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-// ADICIONE 'Cell' AQUI
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Cell } from 'recharts'
 import { 
   Download, 
@@ -16,6 +15,7 @@ import {
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
 
+// Corrigindo erro de autoTable no TypeScript
 declare module 'jspdf' {
   interface jsPDF {
     autoTable: (options: any) => jsPDF
@@ -156,10 +156,10 @@ const Reports: React.FC = () => {
           {categoryData.length > 0 ? (
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={categoryData} layout="vertical" margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                <BarChart data={categoryData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" />
-                  <YAxis type="category" dataKey="name" width={80} />
+                  <YAxis type="category" dataKey="name" width={80} tick={{fontSize: 12}} />
                   <Tooltip formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
                   <Bar dataKey="value" name="Valor">
                     {categoryData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
@@ -195,7 +195,35 @@ const Reports: React.FC = () => {
         {filteredTransactions.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              {/* O teu código da tabela aqui */}
+              <thead className="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Descrição</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Categoria</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tipo</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Valor</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Data</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {filteredTransactions.slice(0, 10).map(transaction => {
+                  const category = categories.find(cat => String(cat.id) === String(transaction.category))
+                  return (
+                    <tr key={transaction.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{transaction.description}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{category?.name}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${transaction.type === 'income' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {transaction.type === 'income' ? 'Receita' : 'Despesa'}
+                        </span>
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                        {transaction.type === 'income' ? '+' : '-'}R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{format(parseISO(transaction.date), 'dd/MM/yyyy')}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
             </table>
           </div>
         ) : (
