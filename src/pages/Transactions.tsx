@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useFinance } from '../contexts/FinanceContext';
 import { Transaction } from '../types';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Plus, Search, Filter, Edit2, Trash2, ArrowUpRight, ArrowDownRight, Loader2, AlertCircle } from 'lucide-react';
 
@@ -45,7 +45,7 @@ const Transactions: React.FC = () => {
   }, [showAddModal, editingTransaction]);
 
   const filteredTransactions = transactions.filter(t => 
-    t.description.toLowerCase().includes(searchTerm.toLowerCase()) && 
+    (t.description || '').toLowerCase().includes(searchTerm.toLowerCase()) && 
     (filterType === 'all' || t.type === filterType)
   );
 
@@ -59,9 +59,8 @@ const Transactions: React.FC = () => {
     setIsSubmitting(true);
     setFormError(null);
 
-    const transactionData = { ...formData, amount: parseFloat(formData.amount) };
+    const transactionData = { ...formData, amount: parseFloat(formData.amount), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     
-    // NOTA: updateTransaction ainda é um placeholder. Apenas a lógica de adicionar está implementada.
     const success = editingTransaction
       ? await updateTransaction(editingTransaction.id, transactionData)
       : await addTransaction(transactionData);
@@ -89,6 +88,7 @@ const Transactions: React.FC = () => {
     setShowAddModal(false);
     setEditingTransaction(null);
     setFormError(null);
+    setFormData(initialFormState);
   };
 
   const availableCategories = categories.filter(cat => cat.type === formData.type && cat.isActive);
@@ -103,11 +103,10 @@ const Transactions: React.FC = () => {
         <button onClick={() => setShowAddModal(true)} className="btn-primary flex items-center gap-2"><Plus size={18}/> Nova Transação</button>
       </div>
 
-      {/* Seção de Filtros (mantida do teu código) */}
-      <div className="flex gap-4">
+      <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-field pl-10" />
+          <input type="text" placeholder="Buscar por descrição..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-field pl-10" />
         </div>
         <div className="flex gap-2">
             <button onClick={() => setFilterType('all')} className={`px-4 py-2 rounded-lg font-medium ${filterType === 'all' ? 'bg-primary-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>Todas</button>
@@ -117,14 +116,14 @@ const Transactions: React.FC = () => {
       </div>
 
       <div className="space-y-3">
-        {filteredTransactions.length > 0 ? filteredTransactions.map(transaction => {
-          const category = categories.find(c => c.id === transaction.category);
-          const account = accounts.find(a => a.id === transaction.accountId);
+        {filteredTransactions.length > 0 ? filteredTransactions.map((transaction) => {
+          const category = categories.find(c => String(c.id) === String(transaction.category));
+          const account = accounts.find(a => String(a.id) === String(transaction.accountId));
           return (
-            <div key={transaction.id} className="card flex items-center justify-between">
+            <div key={`tx-${transaction.type}-${transaction.id}`} className="card flex items-center justify-between p-4">
               <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{backgroundColor: category?.color || '#ccc'}}>
-                      {transaction.type === 'income' ? <ArrowUpRight className="text-white" /> : <ArrowDownRight className="text-white" />}
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-white" style={{backgroundColor: category?.color || '#ccc'}}>
+                      {transaction.type === 'income' ? <ArrowUpRight /> : <ArrowDownRight />}
                   </div>
                   <div>
                       <h3 className="font-medium dark:text-white">{transaction.description}</h3>
@@ -135,8 +134,10 @@ const Transactions: React.FC = () => {
                   <p className={`font-semibold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
                       {transaction.type === 'income' ? '+' : '-'}R$ {transaction.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                   </p>
-                  <button onClick={() => handleEdit(transaction)} className="p-2 text-gray-400 hover:text-primary-600"><Edit2 size={16}/></button>
-                  <button onClick={() => handleDelete(transaction.id)} className="p-2 text-gray-400 hover:text-red-600"><Trash2 size={16}/></button>
+                  <div className="flex items-center">
+                    <button onClick={() => handleEdit(transaction)} className="p-2 text-gray-400 hover:text-primary-600"><Edit2 size={16}/></button>
+                    <button onClick={() => handleDelete(transaction.id)} className="p-2 text-gray-400 hover:text-red-600"><Trash2 size={16}/></button>
+                  </div>
               </div>
             </div>
           );
@@ -155,10 +156,9 @@ const Transactions: React.FC = () => {
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <h2 className="text-xl font-bold dark:text-white">{editingTransaction ? 'Editar Transação' : 'Nova Transação'}</h2>
               {formError && (<div className="p-3 bg-red-100 text-red-700 rounded-md flex items-center gap-2 text-sm"><AlertCircle size={16} /><span>{formError}</span></div>)}
-              {/* Campos do formulário (simplificado) */}
               <input type="text" placeholder="Descrição" name="description" value={formData.description} onChange={e => setFormData(f => ({...f, description: e.target.value}))} className="input-field" disabled={isSubmitting}/>
-              <input type="number" placeholder="Valor" name="amount" value={formData.amount} onChange={e => setFormData(f => ({...f, amount: e.target.value}))} className="input-field" disabled={isSubmitting}/>
-              <select name="type" value={formData.type} onChange={e => setFormData(f => ({...f, type: e.target.value as any}))} className="input-field" disabled={isSubmitting}>
+              <input type="number" step="0.01" placeholder="Valor" name="amount" value={formData.amount} onChange={e => setFormData(f => ({...f, amount: e.target.value}))} className="input-field" disabled={isSubmitting}/>
+              <select name="type" value={formData.type} onChange={e => setFormData(f => ({...f, type: e.target.value as any, category: ''}))} className="input-field" disabled={isSubmitting}>
                   <option value="expense">Despesa</option>
                   <option value="income">Receita</option>
               </select>

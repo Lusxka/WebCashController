@@ -1,7 +1,7 @@
 import React from 'react';
 import { useFinance } from '../contexts/FinanceContext';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { format, subMonths } from 'date-fns';
+import { format, subMonths, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   TrendingUp, 
@@ -130,7 +130,7 @@ const Dashboard: React.FC = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} fill="#8884d8" dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                    {pieData.map((entry, index) => (<Cell key={`cell-pie-${index}`} fill={entry.color} />))}
+                    {pieData.map((entry, index) => (<Cell key={`cell-pie-${entry.name}-${index}`} fill={entry.color} />))}
                   </Pie>
                   <Tooltip formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Valor']} />
                 </PieChart>
@@ -163,7 +163,7 @@ const Dashboard: React.FC = () => {
               const category = categories.find(cat => String(cat.id) === String(transaction.category));
               const account = accounts.find(acc => String(acc.id) === String(transaction.accountId));
               return (
-                <div key={`recent-tx-${transaction.id}`} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div key={`recent-tx-${transaction.id}-${transaction.type}`} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white`} style={{ backgroundColor: category?.color }}><span className="text-sm">{category?.icon}</span></div>
                     <div>
@@ -175,7 +175,7 @@ const Dashboard: React.FC = () => {
                     <p className={`font-semibold ${transaction.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {transaction.type === 'income' ? '+' : '-'}R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{format(new Date(transaction.date), 'dd/MM', { locale: ptBR })}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{format(parseISO(transaction.date), 'dd/MM', { locale: ptBR })}</p>
                   </div>
                 </div>
               )
