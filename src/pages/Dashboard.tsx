@@ -47,7 +47,7 @@ const Dashboard: React.FC = () => {
   const expenseCategories = categories.filter(cat => cat.type === 'expense');
   const pieData = expenseCategories.map(category => {
     const amount = transactions
-      .filter(t => t.date && t.category === category.id && t.type === 'expense') // <-- Adicionada verificação de segurança
+      .filter(t => t.date && String(t.category) === String(category.id) && t.type === 'expense')
       .reduce((sum, t) => sum + t.amount, 0)
     return { name: category.name, value: amount, color: category.color }
   }).filter(item => item.value > 0);
@@ -62,7 +62,7 @@ const Dashboard: React.FC = () => {
   }).reverse();
 
   const recentTransactions = [...transactions]
-    .filter(t => t.date) // <-- Adicionada verificação de segurança
+    .filter(t => t.date)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5);
 
@@ -130,7 +130,7 @@ const Dashboard: React.FC = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} fill="#8884d8" dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                    {pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
+                    {pieData.map((entry, index) => (<Cell key={`cell-pie-${index}`} fill={entry.color} />))}
                   </Pie>
                   <Tooltip formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Valor']} />
                 </PieChart>
@@ -160,10 +160,10 @@ const Dashboard: React.FC = () => {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Transações Recentes</h3>
           <div className="space-y-3">
             {recentTransactions.map(transaction => {
-              const category = categories.find(cat => cat.id === transaction.category);
-              const account = accounts.find(acc => acc.id === transaction.accountId);
+              const category = categories.find(cat => String(cat.id) === String(transaction.category));
+              const account = accounts.find(acc => String(acc.id) === String(transaction.accountId));
               return (
-                <div key={transaction.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div key={`recent-tx-${transaction.id}`} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white`} style={{ backgroundColor: category?.color }}><span className="text-sm">{category?.icon}</span></div>
                     <div>
@@ -189,7 +189,7 @@ const Dashboard: React.FC = () => {
             {goals.slice(0, 3).map(goal => {
               const progress = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
               return (
-                <div key={goal.id} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div key={`goal-${goal.id}`} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="font-medium text-gray-900 dark:text-white">{goal.name}</h4>
                     <Target className="w-5 h-5 text-primary-600 dark:text-primary-400" />

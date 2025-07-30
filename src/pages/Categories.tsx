@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useFinance } from '../contexts/FinanceContext';
 import { Category } from '../types';
 import { Plus, Edit2, Trash2, Loader2, AlertCircle, Tag } from 'lucide-react';
@@ -6,7 +6,7 @@ import { Plus, Edit2, Trash2, Loader2, AlertCircle, Tag } from 'lucide-react';
 type CategoryFormData = Omit<Category, 'id' | 'isActive'>;
 
 const Categories: React.FC = () => {
-  const { categories, addCategory, updateCategory, deleteCategory, isFinanceLoading, financeError } = useFinance();
+  const { categories, transactions, addCategory, updateCategory, deleteCategory, isFinanceLoading, financeError } = useFinance();
   
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -17,6 +17,18 @@ const Categories: React.FC = () => {
   const [formData, setFormData] = useState<CategoryFormData>(initialFormState);
 
   const colors = ['#3B82F6', '#10B981', '#EF4444', '#7C3AED', '#F97316', '#0891B2', '#EC4899', '#84CC16'];
+
+  const categoryTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    transactions.forEach(transaction => {
+        if (!transaction.category) return;
+        const currentTotal = totals.get(String(transaction.category)) || 0;
+        // Se for despesa, consideramos o valor. Se for receita, também.
+        // O tipo de categoria (despesa/receita) já filtra o que é exibido.
+        totals.set(String(transaction.category), currentTotal + transaction.amount);
+    });
+    return totals;
+  }, [transactions]);
 
   useEffect(() => {
     if (showModal) {
@@ -67,13 +79,8 @@ const Categories: React.FC = () => {
     setFormError(null);
   };
 
-  if (isFinanceLoading) {
-    return <div className="flex justify-center items-center h-full p-8"><Loader2 className="w-16 h-16 animate-spin text-primary-600" /></div>;
-  }
-
-  if (financeError) {
-    return <div className="p-4 bg-red-100 text-red-700 rounded-md">Ocorreu um erro: {financeError}</div>;
-  }
+  if (isFinanceLoading) return <div className="flex justify-center items-center h-full p-8"><Loader2 className="w-16 h-16 animate-spin text-primary-600" /></div>;
+  if (financeError) return <div className="p-4 bg-red-100 text-red-700 rounded-md">Ocorreu um erro: {financeError}</div>;
 
   return (
     <div className="space-y-6">
@@ -82,31 +89,40 @@ const Categories: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Categorias</h1>
           <p className="text-gray-600 dark:text-gray-400">Organize suas receitas e despesas</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2">
-            <Plus size={18}/> Nova Categoria
-        </button>
+        <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2"><Plus size={18}/> Nova Categoria</button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {categories.map(category => (
-          <div key={category.id} className="card flex items-center justify-between p-4">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{backgroundColor: category.color}}>
-                {category.icon}
-              </div>
-              <div>
-                <p className="font-medium text-gray-900 dark:text-white">{category.name}</p>
-                <p className={`text-sm ${category.type === 'income' ? 'text-green-500' : 'text-red-500'}`}>
-                  {category.type === 'income' ? 'Receita' : 'Despesa'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <button onClick={() => handleEdit(category)} className="p-2 text-gray-400 hover:text-primary-600"><Edit2 size={16}/></button>
-              <button onClick={() => handleDelete(category.id)} className="p-2 text-gray-400 hover:text-red-600"><Trash2 size={16}/></button>
-            </div>
-          </div>
-        ))}
+        {categories.map(category => {
+            const total = categoryTotals.get(String(category.id)) || 0;
+            return (
+                <div key={category.id} className="card p-4 flex flex-col justify-between">
+                    <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl" style={{backgroundColor: category.color}}>
+                                {category.icon}
+                            </div>
+                            <div>
+                                <p className="font-bold text-lg text-gray-800 dark:text-white">{category.name}</p>
+                                <p className={`text-sm font-medium ${category.type === 'income' ? 'text-green-500' : 'text-red-500'}`}>
+                                {category.type === 'income' ? 'Receita' : 'Despesa'}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex">
+                            <button onClick={() => handleEdit(category)} className="p-2 text-gray-400 hover:text-primary-600"><Edit2 size={16}/></button>
+                            <button onClick={() => handleDelete(category.id)} className="p-2 text-gray-400 hover:text-red-600"><Trash2 size={16}/></button>
+                        </div>
+                    </div>
+                    <div className="text-right mt-4">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Total na Categoria</p>
+                        <p className={`text-2xl font-bold ${category.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                            R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                    </div>
+                </div>
+            );
+        })}
         {categories.length === 0 && (
             <div className="col-span-full text-center py-12 card">
                 <Tag size={48} className="mx-auto text-gray-400"/>
