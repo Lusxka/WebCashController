@@ -9,7 +9,8 @@ import {
   Settings,
   Plus,
   LogOut,
-  User
+  User,
+  Tag // <-- 1. ÍCONE ADICIONADO
 } from 'lucide-react'
 
 interface LayoutProps {
@@ -24,6 +25,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/', icon: Home, label: 'Início' },
     { path: '/transacoes', icon: CreditCard, label: 'Transações' },
     { path: '/contas', icon: Wallet, label: 'Contas' },
+    { path: '/categorias', icon: Tag, label: 'Categorias' }, // <-- 2. LINK ADICIONADO
     { path: '/relatorios', icon: BarChart3, label: 'Relatórios' },
     { path: '/configuracoes', icon: Settings, label: 'Config' },
   ]
@@ -157,4 +159,4 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   )
 }
 
-export default Layout
+export default Layout;
