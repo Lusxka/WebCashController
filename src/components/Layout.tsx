@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'; // 1. Adicionado useMemo
+import React, { useMemo } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -32,12 +32,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   
   const settingsItem = { path: '/configuracoes', icon: Settings, label: 'Config' };
 
-  // <-- LÓGICA ADICIONADA PARA ABREVIAR O NOME -->
   const abbreviatedUserName = useMemo(() => {
     const fullName = user?.name;
     if (!fullName) return '';
     
-    const parts = fullName.trim().split(' ').filter(p => p); // Remove espaços em branco extras
+    const parts = fullName.trim().split(' ').filter(p => p);
     
     if (parts.length > 1) {
       return `${parts[0]} ${parts[parts.length - 1]}`;
@@ -81,11 +80,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </div>
                 <div className="text-sm hidden sm:block">
                   <p className="font-medium text-gray-900 dark:text-white truncate">
-                    {abbreviatedUserName} {/* <-- NOME ABREVIADO USADO AQUI */}
+                    {abbreviatedUserName}
                   </p>
-                  <p className="text-gray-500 dark:text-gray-400 truncate">
-                    {user?.email}
-                  </p>
+                  {/* <-- LINHA DO EMAIL REMOVIDA --> */}
                 </div>
               </div>
               
