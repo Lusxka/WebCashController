@@ -4,21 +4,12 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 import { format, subMonths, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-    TrendingUp,
-    TrendingDown,
-    Wallet,
-    Target,
-    ArrowUpRight,
-    ArrowDownRight,
-    Loader2,
-    Plus,
-    CheckCircle,
-    Trash2,
-    X
+    TrendingUp, TrendingDown, Wallet, Target, ArrowUpRight, ArrowDownRight,
+    Loader2, Plus, CheckCircle, Trash2, X
 } from 'lucide-react';
 import { Goal } from '../types';
+import ConfirmationModal from '../components/ConfirmationModal';
 
-// Componente para o Card de Meta (Lógica de exibição)
 const GoalCard: React.FC<{ goal: Goal; onAddFunds: (goal: Goal) => void; onDelete: (id: string) => void; }> = ({ goal, onAddFunds, onDelete }) => {
     const progress = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
     const isCompleted = progress >= 100;
@@ -47,7 +38,6 @@ const GoalCard: React.FC<{ goal: Goal; onAddFunds: (goal: Goal) => void; onDelet
                 </>
             )}
              <div className="flex items-center justify-end gap-2 mt-3">
-                 {/* 👇 BOTÃO "ADICIONAR VALOR" ATUALIZADO AQUI 👇 */}
                 <button 
                     onClick={() => onAddFunds(goal)} 
                     disabled={isCompleted} 
@@ -76,6 +66,9 @@ const Dashboard: React.FC = () => {
     const [newGoalName, setNewGoalName] = useState('');
     const [newGoalAmount, setNewGoalAmount] = useState('');
     const [fundsToAdd, setFundsToAdd] = useState('');
+    
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [goalToDelete, setGoalToDelete] = useState<string | null>(null);
 
     const handleOpenAddFundsModal = (goal: Goal) => {
         setSelectedGoal(goal);
@@ -105,11 +98,18 @@ const Dashboard: React.FC = () => {
         }
     };
 
-    const handleDeleteGoal = async (id: string) => {
-        if(confirm('Tem certeza que deseja excluir esta meta?')) {
-            await deleteGoal(id);
+    const handleDeleteGoal = (id: string) => {
+        setGoalToDelete(id);
+        setShowDeleteConfirm(true);
+    };
+
+    const confirmDeleteGoal = async () => {
+        if (goalToDelete) {
+            await deleteGoal(goalToDelete);
+            setGoalToDelete(null);
+            setShowDeleteConfirm(false);
         }
-    }
+    };
 
     if (isFinanceLoading) {
         return <div className="flex justify-center items-center h-full p-8"><Loader2 className="w-16 h-16 animate-spin text-primary-600" /></div>;
@@ -331,6 +331,15 @@ const Dashboard: React.FC = () => {
                     </div>
                 </div>
             )}
+            
+            <ConfirmationModal
+                isOpen={showDeleteConfirm}
+                onClose={() => setShowDeleteConfirm(false)}
+                onConfirm={confirmDeleteGoal}
+                title="Excluir Meta"
+                message="Você tem certeza que deseja excluir esta meta? Esta ação não pode ser desfeita."
+                confirmText="Sim, Excluir"
+            />
         </div>
     );
 };
