@@ -10,6 +10,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
+  resetAccountData: () => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,7 +28,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Efeito 1: Ouve o estado de autenticação do Supabase
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSupabaseUser(session?.user ?? null);
@@ -42,7 +42,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  // Efeito 2: Reage à mudança do utilizador para buscar o perfil
   useEffect(() => {
     if (!supabaseUser) {
       setUser(null);
@@ -89,7 +88,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSupabaseUser(null);
   };
 
-  const value: AuthContextType = { user, isLoading, isAuthenticated: !!user, login, register, logout };
+  // 👇 FUNÇÃO ATUALIZADA COM MAIS LOGS PARA DEBUG 👇
+  const resetAccountData = async () => {
+    console.log('[AuthContext] Iniciando chamada RPC para "reset_user_data"...');
+    try {
+      // Chama a função que criamos no SQL
+      const { error } = await supabase.rpc('reset_user_data');
+  
+      // Se o Supabase retornar um objeto de erro, NÓS VAMOS VER AGORA
+      if (error) {
+        console.error('[AuthContext] ERRO EXPLÍCITO retornado pela chamada RPC:', error);
+        throw error; // Lança o erro para que a função que chamou saiba que falhou.
+      }
+  
+      console.log('[AuthContext] Função RPC "reset_user_data" executada COM SUCESSO no servidor.');
+      return { success: true };
+
+    } catch (err: any) {
+      console.error('[AuthContext] ERRO GERAL (CATCH) ao tentar executar a função RPC:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const value: AuthContextType = { 
+    user, 
+    isLoading, 
+    isAuthenticated: !!user, 
+    login, 
+    register, 
+    logout,
+    resetAccountData
+  };
 
   return (
     <AuthContext.Provider value={value}>
