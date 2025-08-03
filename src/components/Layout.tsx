@@ -117,9 +117,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </nav>
 
-      <button onClick={() => alert('Ação Rápida!')} className="lg:hidden fixed bottom-20 right-6 w-14 h-14 bg-primary-600 hover:bg-primary-700 text-white rounded-full shadow-lg flex items-center justify-center transition-transform duration-200 hover:scale-110 active:scale-95">
-        <Plus className="w-6 h-6" />
-      </button>
+      
     </div>
   );
 };
