@@ -9,7 +9,9 @@ import {
 } from 'lucide-react';
 import { Goal } from '../types';
 import ConfirmationModal from '../components/ConfirmationModal';
+import CurrencyInput from 'react-currency-input-field'; // Importe o novo componente
 
+// Componente GoalCard (inalterado)
 const GoalCard: React.FC<{ goal: Goal; onAddFunds: (goal: Goal) => void; onDelete: (id: string) => void; }> = ({ goal, onAddFunds, onDelete }) => {
     const progress = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
     const isCompleted = progress >= 100;
@@ -54,8 +56,7 @@ const GoalCard: React.FC<{ goal: Goal; onAddFunds: (goal: Goal) => void; onDelet
 
 const Dashboard: React.FC = () => {
     const {
-        transactions, accounts, categories, goals,
-        addGoal, updateGoal, deleteGoal,
+        transactions, accounts, categories, goals, addGoal, updateGoal, deleteGoal,
         getTotalBalance, getMonthlyIncome, getMonthlyExpenses,
         isFinanceLoading, financeError
     } = useFinance();
@@ -64,8 +65,8 @@ const Dashboard: React.FC = () => {
     const [isAddFundsModalOpen, setAddFundsModalOpen] = useState(false);
     const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
     const [newGoalName, setNewGoalName] = useState('');
-    const [newGoalAmount, setNewGoalAmount] = useState('');
-    const [fundsToAdd, setFundsToAdd] = useState('');
+    const [newGoalAmount, setNewGoalAmount] = useState<string | undefined>(''); // Alterado para string
+    const [fundsToAdd, setFundsToAdd] = useState<string | undefined>(''); // Alterado para string
     
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [goalToDelete, setGoalToDelete] = useState<string | null>(null);
@@ -77,7 +78,7 @@ const Dashboard: React.FC = () => {
     
     const handleAddGoal = async (e: React.FormEvent) => {
         e.preventDefault();
-        const amount = parseFloat(newGoalAmount);
+        const amount = parseFloat(newGoalAmount || '0');
         if (newGoalName && amount > 0) {
             await addGoal({ name: newGoalName, targetAmount: amount });
             setNewGoalName('');
@@ -88,7 +89,7 @@ const Dashboard: React.FC = () => {
     
     const handleAddFunds = async (e: React.FormEvent) => {
         e.preventDefault();
-        const amount = parseFloat(fundsToAdd);
+        const amount = parseFloat(fundsToAdd || '0');
         if (selectedGoal && amount > 0) {
             const newCurrentAmount = selectedGoal.currentAmount + amount;
             await updateGoal(selectedGoal.id, { currentAmount: newCurrentAmount });
@@ -111,39 +112,29 @@ const Dashboard: React.FC = () => {
         }
     };
 
-    if (isFinanceLoading) {
-        return <div className="flex justify-center items-center h-full p-8"><Loader2 className="w-16 h-16 animate-spin text-primary-600" /></div>;
-    }
-    if (financeError) {
-        return <div className="p-4 bg-red-100 text-red-700 rounded-md">Ocorreu um erro: {financeError}</div>;
-    }
+    if (isFinanceLoading) return <div className="flex justify-center items-center h-full p-8"><Loader2 className="w-16 h-16 animate-spin text-primary-600" /></div>;
+    if (financeError) return <div className="p-4 bg-red-100 text-red-700 rounded-md">Ocorreu um erro: {financeError}</div>;
 
     const totalBalance = getTotalBalance();
     const currentMonthIncome = getMonthlyIncome();
     const currentMonthExpenses = getMonthlyExpenses();
     const savingsPercentage = currentMonthIncome > 0 ? ((currentMonthIncome - currentMonthExpenses) / currentMonthIncome * 100) : 0;
-
-    const expenseCategories = categories.filter(cat => cat.type === 'expense');
-    const pieData = expenseCategories.map(category => {
-        const amount = transactions
-            .filter(t => t.date && String(t.category) === String(category.id) && t.type === 'expense')
-            .reduce((sum, t) => sum + t.amount, 0)
-        return { name: category.name, value: amount, color: category.color }
-    }).filter(item => item.value > 0);
-
+    const pieData = categories.filter(c => c.type === 'expense').map(cat => ({
+        name: cat.name,
+        value: transactions.filter(t => t.type === 'expense' && String(t.category) === String(cat.id)).reduce((sum, t) => sum + t.amount, 0),
+        color: cat.color
+    })).filter(d => d.value > 0);
     const last6Months = Array.from({ length: 6 }, (_, i) => {
-        const date = subMonths(new Date(), i);
-        const monthKey = format(date, 'yyyy-MM');
-        const monthName = format(date, 'MMM', { locale: ptBR });
-        const income = transactions.filter(t => t.date && t.type === 'income' && t.date.startsWith(monthKey)).reduce((sum, t) => sum + t.amount, 0);
-        const expense = transactions.filter(t => t.date && t.type === 'expense' && t.date.startsWith(monthKey)).reduce((sum, t) => sum + t.amount, 0);
-        return { month: monthName, receitas: income, despesas: expense };
+        const d = subMonths(new Date(), i);
+        const key = format(d, 'yyyy-MM');
+        const name = format(d, 'MMM', { locale: ptBR });
+        return {
+            month: name,
+            receitas: transactions.filter(t => t.type === 'income' && t.date.startsWith(key)).reduce((sum, t) => sum + t.amount, 0),
+            despesas: transactions.filter(t => t.type === 'expense' && t.date.startsWith(key)).reduce((sum, t) => sum + t.amount, 0),
+        }
     }).reverse();
-
-    const recentTransactions = [...transactions]
-        .filter(t => t.date)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, 5);
+    const recentTransactions = [...transactions].filter(t => t.date).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
 
     return (
         <div className="space-y-6">
@@ -266,9 +257,7 @@ const Dashboard: React.FC = () => {
                 <div className="card">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Metas Financeiras</h3>
-                        <button 
-                            onClick={() => setAddGoalModalOpen(true)} 
-                            className="bg-gradient-to-br from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white font-semibold rounded-md shadow-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75 flex items-center gap-2 transition duration-200 ease-in-out">
+                        <button onClick={() => setAddGoalModalOpen(true)} className="bg-gradient-to-br from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white font-semibold rounded-md shadow-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75 flex items-center gap-2 transition duration-200 ease-in-out">
                             <Plus className="w-4 h-4" /> Nova Meta
                         </button>
                     </div>
@@ -300,7 +289,19 @@ const Dashboard: React.FC = () => {
                             </div>
                             <div>
                                 <label className="label-form">Valor Alvo (R$)</label>
-                                <input type="number" value={newGoalAmount} onChange={e => setNewGoalAmount(e.target.value)} className="input-field" placeholder="Ex: 5000" min="0.01" step="0.01" required />
+                                <CurrencyInput
+                                    id="new-goal-amount"
+                                    name="new-goal-amount"
+                                    className="input-field"
+                                    placeholder="R$ 5.000,00"
+                                    value={newGoalAmount}
+                                    onValueChange={(value) => setNewGoalAmount(value)}
+                                    prefix="R$ "
+                                    groupSeparator="."
+                                    decimalSeparator=","
+                                    decimalsLimit={2}
+                                    required
+                                />
                             </div>
                             <div className="flex justify-end gap-3 pt-4">
                                 <button type="button" onClick={() => setAddGoalModalOpen(false)} className="btn-secondary">Cancelar</button>
@@ -321,7 +322,20 @@ const Dashboard: React.FC = () => {
                             <p className="text-gray-700 dark:text-gray-300">Meta: <span className="font-semibold">{selectedGoal.name}</span></p>
                             <div>
                                 <label className="label-form">Valor a Adicionar (R$)</label>
-                                <input type="number" value={fundsToAdd} onChange={e => setFundsToAdd(e.target.value)} className="input-field" placeholder="Ex: 100" min="0.01" step="0.01" required autoFocus/>
+                                <CurrencyInput
+                                    id="funds-to-add"
+                                    name="funds-to-add"
+                                    className="input-field"
+                                    placeholder="R$ 100,00"
+                                    value={fundsToAdd}
+                                    onValueChange={(value) => setFundsToAdd(value)}
+                                    prefix="R$ "
+                                    groupSeparator="."
+                                    decimalSeparator=","
+                                    decimalsLimit={2}
+                                    required
+                                    autoFocus
+                                />
                             </div>
                              <div className="flex justify-end gap-3 pt-4">
                                 <button type="button" onClick={() => setAddFundsModalOpen(false)} className="btn-secondary">Cancelar</button>

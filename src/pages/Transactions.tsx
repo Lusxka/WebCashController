@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useFinance } from '../contexts/FinanceContext';
 import { Transaction } from '../types';
 import { format, parseISO } from 'date-fns';
-import { Plus, Search, Edit2, Trash2, ArrowUpRight, ArrowDownRight, Loader2, AlertCircle } from 'lucide-react';
+import { Plus, Search, Filter, Edit2, Trash2, ArrowUpRight, ArrowDownRight, Loader2, AlertCircle } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
+import CurrencyInput from 'react-currency-input-field'; // Importe o novo componente
 
 const Transactions: React.FC = () => {
     const { transactions, accounts, categories, addTransaction, updateTransaction, deleteTransaction, isFinanceLoading, financeError } = useFinance();
@@ -20,7 +21,7 @@ const Transactions: React.FC = () => {
 
     const initialFormState = {
         type: 'expense' as 'income' | 'expense',
-        amount: '',
+        amount: '' as string | undefined,
         description: '',
         category: '',
         accountId: '',
@@ -62,9 +63,9 @@ const Transactions: React.FC = () => {
         setIsSubmitting(true);
         setFormError(null);
 
-        // @ts-ignore
         const transactionData = { ...formData, amount: parseFloat(formData.amount), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
         
+        // @ts-ignore
         const success = editingTransaction
             // @ts-ignore
             ? await updateTransaction(editingTransaction.id, transactionData)
@@ -167,8 +168,23 @@ const Transactions: React.FC = () => {
                         <form onSubmit={handleSubmit} className="p-6 space-y-4">
                             <h2 className="text-xl font-bold dark:text-white">{editingTransaction ? 'Editar Transação' : 'Nova Transação'}</h2>
                             {formError && (<div className="p-3 bg-red-100 text-red-700 rounded-md flex items-center gap-2 text-sm"><AlertCircle size={16} /><span>{formError}</span></div>)}
+                            
                             <input type="text" placeholder="Descrição" name="description" value={formData.description} onChange={e => setFormData(f => ({...f, description: e.target.value}))} className="input-field" disabled={isSubmitting}/>
-                            <input type="number" step="0.01" placeholder="Valor" name="amount" value={formData.amount} onChange={e => setFormData(f => ({...f, amount: e.target.value}))} className="input-field" disabled={isSubmitting}/>
+                            
+                            <CurrencyInput
+                                id="transaction-amount"
+                                name="amount"
+                                className="input-field"
+                                placeholder="R$ 0,00"
+                                value={formData.amount}
+                                onValueChange={(value) => setFormData(f => ({ ...f, amount: value || '' }))}
+                                prefix="R$ "
+                                groupSeparator="."
+                                decimalSeparator=","
+                                decimalsLimit={2}
+                                disabled={isSubmitting}
+                            />
+                            
                             <select name="type" value={formData.type} onChange={e => setFormData(f => ({...f, type: e.target.value as any, category: ''}))} className="input-field" disabled={isSubmitting}>
                                 <option value="expense">Despesa</option>
                                 <option value="income">Receita</option>
