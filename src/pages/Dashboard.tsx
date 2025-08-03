@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Goal } from '../types';
 import ConfirmationModal from '../components/ConfirmationModal';
-import CurrencyInput from 'react-currency-input-field'; // Importe o novo componente
+import CurrencyInput from 'react-currency-input-field';
 
 // Componente GoalCard (inalterado)
 const GoalCard: React.FC<{ goal: Goal; onAddFunds: (goal: Goal) => void; onDelete: (id: string) => void; }> = ({ goal, onAddFunds, onDelete }) => {
@@ -65,8 +65,9 @@ const Dashboard: React.FC = () => {
     const [isAddFundsModalOpen, setAddFundsModalOpen] = useState(false);
     const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
     const [newGoalName, setNewGoalName] = useState('');
-    const [newGoalAmount, setNewGoalAmount] = useState<string | undefined>(''); // Alterado para string
-    const [fundsToAdd, setFundsToAdd] = useState<string | undefined>(''); // Alterado para string
+    const [newGoalAmount, setNewGoalAmount] = useState<string | undefined>('');
+    const [newGoalDate, setNewGoalDate] = useState(format(new Date(), 'yyyy-MM-dd')); // NOVO ESTADO
+    const [fundsToAdd, setFundsToAdd] = useState<string | undefined>('');
     
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [goalToDelete, setGoalToDelete] = useState<string | null>(null);
@@ -78,18 +79,23 @@ const Dashboard: React.FC = () => {
     
     const handleAddGoal = async (e: React.FormEvent) => {
         e.preventDefault();
-        const amount = parseFloat(newGoalAmount || '0');
+        const amount = parseFloat((newGoalAmount || '0').replace(/\./g, '').replace(',', '.'));
         if (newGoalName && amount > 0) {
-            await addGoal({ name: newGoalName, targetAmount: amount });
+            await addGoal({ 
+                name: newGoalName, 
+                targetAmount: amount,
+                targetDate: newGoalDate // Adiciona a data
+            });
             setNewGoalName('');
             setNewGoalAmount('');
+            setNewGoalDate(format(new Date(), 'yyyy-MM-dd')); // Redefine a data
             setAddGoalModalOpen(false);
         }
     };
     
     const handleAddFunds = async (e: React.FormEvent) => {
         e.preventDefault();
-        const amount = parseFloat(fundsToAdd || '0');
+        const amount = parseFloat((fundsToAdd || '0').replace(/\./g, '').replace(',', '.'));
         if (selectedGoal && amount > 0) {
             const newCurrentAmount = selectedGoal.currentAmount + amount;
             await updateGoal(selectedGoal.id, { currentAmount: newCurrentAmount });
@@ -280,8 +286,8 @@ const Dashboard: React.FC = () => {
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
                         <form onSubmit={handleAddGoal} className="p-6 space-y-4">
                              <div className="flex items-center justify-between">
-                                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Criar Nova Meta</h2>
-                                <button type="button" onClick={() => setAddGoalModalOpen(false)} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><X/></button>
+                                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">Criar Nova Meta</h2>
+                                 <button type="button" onClick={() => setAddGoalModalOpen(false)} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><X/></button>
                              </div>
                             <div>
                                 <label className="label-form">Nome da Meta</label>
@@ -303,6 +309,10 @@ const Dashboard: React.FC = () => {
                                     required
                                 />
                             </div>
+                            <div>
+                                <label className="label-form">Data Alvo</label>
+                                <input type="date" value={newGoalDate} onChange={e => setNewGoalDate(e.target.value)} className="input-field" required />
+                            </div>
                             <div className="flex justify-end gap-3 pt-4">
                                 <button type="button" onClick={() => setAddGoalModalOpen(false)} className="btn-secondary">Cancelar</button>
                                 <button type="submit" className="btn-primary">Salvar Meta</button>
@@ -313,37 +323,37 @@ const Dashboard: React.FC = () => {
             )}
             {isAddFundsModalOpen && selectedGoal && (
                  <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
-                        <form onSubmit={handleAddFunds} className="p-6 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Adicionar Valor</h2>
-                                <button type="button" onClick={() => setAddFundsModalOpen(false)} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><X/></button>
-                            </div>
-                            <p className="text-gray-700 dark:text-gray-300">Meta: <span className="font-semibold">{selectedGoal.name}</span></p>
-                            <div>
-                                <label className="label-form">Valor a Adicionar (R$)</label>
-                                <CurrencyInput
-                                    id="funds-to-add"
-                                    name="funds-to-add"
-                                    className="input-field"
-                                    placeholder="R$ 100,00"
-                                    value={fundsToAdd}
-                                    onValueChange={(value) => setFundsToAdd(value)}
-                                    prefix="R$ "
-                                    groupSeparator="."
-                                    decimalSeparator=","
-                                    decimalsLimit={2}
-                                    required
-                                    autoFocus
-                                />
-                            </div>
-                             <div className="flex justify-end gap-3 pt-4">
-                                <button type="button" onClick={() => setAddFundsModalOpen(false)} className="btn-secondary">Cancelar</button>
-                                <button type="submit" className="btn-primary">Adicionar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
+                         <form onSubmit={handleAddFunds} className="p-6 space-y-4">
+                             <div className="flex items-center justify-between">
+                                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">Adicionar Valor</h2>
+                                 <button type="button" onClick={() => setAddFundsModalOpen(false)} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><X/></button>
+                             </div>
+                             <p className="text-gray-700 dark:text-gray-300">Meta: <span className="font-semibold">{selectedGoal.name}</span></p>
+                             <div>
+                                 <label className="label-form">Valor a Adicionar (R$)</label>
+                                 <CurrencyInput
+                                     id="funds-to-add"
+                                     name="funds-to-add"
+                                     className="input-field"
+                                     placeholder="R$ 100,00"
+                                     value={fundsToAdd}
+                                     onValueChange={(value) => setFundsToAdd(value)}
+                                     prefix="R$ "
+                                     groupSeparator="."
+                                     decimalSeparator=","
+                                     decimalsLimit={2}
+                                     required
+                                     autoFocus
+                                 />
+                             </div>
+                              <div className="flex justify-end gap-3 pt-4">
+                                 <button type="button" onClick={() => setAddFundsModalOpen(false)} className="btn-secondary">Cancelar</button>
+                                 <button type="submit" className="btn-primary">Adicionar</button>
+                             </div>
+                         </form>
+                     </div>
+                 </div>
             )}
             
             <ConfirmationModal

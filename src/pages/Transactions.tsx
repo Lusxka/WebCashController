@@ -63,19 +63,29 @@ const Transactions: React.FC = () => {
         setIsSubmitting(true);
         setFormError(null);
 
-        const transactionData = { ...formData, amount: parseFloat(formData.amount), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-        
-        // @ts-ignore
-        const success = editingTransaction
-            // @ts-ignore
-            ? await updateTransaction(editingTransaction.id, transactionData)
-            : await addTransaction(transactionData);
+        try {
+            // Converte a string de moeda (ex: '1.234,56') para um número
+            const numericAmount = parseFloat((formData.amount || '').replace(/\./g, '').replace(',', '.'));
 
-        setIsSubmitting(false);
-        if (success) {
+            const transactionData = { 
+                ...formData, 
+                amount: numericAmount, 
+                createdAt: new Date().toISOString(), 
+                updatedAt: new Date().toISOString() 
+            };
+            
+            if (editingTransaction) {
+                await updateTransaction(editingTransaction.id, transactionData);
+            } else {
+                await addTransaction(transactionData);
+            }
+
             resetForm();
-        } else {
+        } catch (error) {
+            console.error("Falha ao salvar a transação:", error);
             setFormError("Não foi possível salvar a transação. Tente novamente.");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 

@@ -52,15 +52,22 @@ const Categories: React.FC = () => {
         setIsSubmitting(true);
         setFormError(null);
         
-        const success = editingCategory 
-            ? await updateCategory(editingCategory.id, formData)
-            : await addCategory(formData);
-
-        setIsSubmitting(false);
-        if (success) {
+        try {
+            if (editingCategory) {
+                // Ao editar, mantém o valor original de 'isActive'
+                const updateData = { ...formData, isActive: editingCategory.isActive };
+                await updateCategory(editingCategory.id, updateData);
+            } else {
+                // Ao adicionar, define 'isActive' como true por padrão
+                const addData = { ...formData, isActive: true };
+                await addCategory(addData);
+            }
             resetForm();
-        } else {
+        } catch (error) {
+            console.error("Falha ao salvar a categoria:", error);
             setFormError("Não foi possível salvar a categoria. Tente novamente.");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -86,6 +93,7 @@ const Categories: React.FC = () => {
         setShowModal(false);
         setEditingCategory(null);
         setFormError(null);
+        setFormData(initialFormState); // Redefine para o estado inicial
     };
 
     if (isFinanceLoading) return <div className="flex justify-center items-center h-full p-8"><Loader2 className="w-16 h-16 animate-spin text-primary-600" /></div>;
@@ -114,7 +122,7 @@ const Categories: React.FC = () => {
                                     <div>
                                         <p className="font-bold text-lg text-gray-800 dark:text-white">{category.name}</p>
                                         <p className={`text-sm font-medium ${category.type === 'income' ? 'text-green-500' : 'text-red-500'}`}>
-                                        {category.type === 'income' ? 'Receita' : 'Despesa'}
+                                            {category.type === 'income' ? 'Receita' : 'Despesa'}
                                         </p>
                                     </div>
                                 </div>
