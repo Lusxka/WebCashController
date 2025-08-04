@@ -82,7 +82,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <p className="font-medium text-gray-900 dark:text-white truncate">
                     {abbreviatedUserName}
                   </p>
-                  {/* <-- LINHA DO EMAIL REMOVIDA --> */}
+                 
                 </div>
               </div>
               

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useFinance } from '../contexts/FinanceContext';
-import { format, startOfMonth, endOfMonth, subMonths, parseISO, startOfToday, endOfToday } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, parseISO, endOfToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
     ResponsiveContainer,
@@ -53,7 +53,6 @@ const Reports: React.FC = () => {
     const [selectedPeriod, setSelectedPeriod] = useState('current-month');
     const [selectedAccount, setSelectedAccount] = useState('all');
 
-    // O useMemo otimiza o cálculo, refazendo-o apenas quando as dependências mudam.
     const { filteredTransactions, dateRangeLabel } = useMemo(() => {
         const now = new Date();
         let start: Date, end: Date, label: string;
@@ -90,62 +89,128 @@ const Reports: React.FC = () => {
             return inDateRange && inAccount;
         });
 
-        return { filteredTransactions: filtered, dateRangeLabel: label };
+        return { filteredTransactions: filtered.sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime()), dateRangeLabel: label };
     }, [transactions, selectedPeriod, selectedAccount]);
 
-    // Cálculos para os cards de resumo
+    // Cálculos para os cards de resumo e para o PDF
     const totalIncome = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const totalExpenses = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
     const netBalance = totalIncome - totalExpenses;
 
-    // Dados para o Gráfico de Pizza (Despesas por Categoria)
     const categoryData = useMemo(() => {
         const expenseCategories = categories.filter(cat => cat.type === 'expense');
-        const total = filteredTransactions
-            .filter(t => t.type === 'expense')
-            .reduce((sum, t) => sum + t.amount, 0);
-
+        const total = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
         if (total === 0) return [];
-
         return expenseCategories.map(category => {
-            const amount = filteredTransactions
-                .filter(t => String(t.category) === String(category.id) && t.type === 'expense')
-                .reduce((sum, t) => sum + t.amount, 0);
-
-            return {
-                name: category.name,
-                value: amount,
-                color: category.color || '#8884d8',
-                percent: total > 0 ? (amount / total) * 100 : 0
-            };
-        })
-            .filter(item => item.value > 0)
-            .sort((a, b) => b.value - a.value);
+            const amount = filteredTransactions.filter(t => String(t.category) === String(category.id) && t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+            return { name: category.name, value: amount, color: category.color || '#8884d8', percent: total > 0 ? (amount / total) * 100 : 0 };
+        }).filter(item => item.value > 0).sort((a, b) => b.value - a.value);
     }, [filteredTransactions, categories]);
 
-    // Dados para o Gráfico de Área (Evolução Mensal)
     const monthlyData = useMemo(() => {
-        const evolutionTransactions = transactions.filter(t =>
-            selectedAccount === 'all' || String(t.accountId) === selectedAccount
-        );
-
+        const evolutionTransactions = transactions.filter(t => selectedAccount === 'all' || String(t.accountId) === selectedAccount);
         return Array.from({ length: 6 }, (_, i) => {
             const date = subMonths(new Date(), 5 - i);
             const monthKey = format(date, 'yyyy-MM');
             const monthName = format(date, 'MMM', { locale: ptBR });
-
-            const income = evolutionTransactions
-                .filter(t => t.date && t.type === 'income' && t.date.startsWith(monthKey))
-                .reduce((sum, t) => sum + t.amount, 0);
-
-            const expense = evolutionTransactions
-                .filter(t => t.date && t.type === 'expense' && t.date.startsWith(monthKey))
-                .reduce((sum, t) => sum + t.amount, 0);
-
+            const income = evolutionTransactions.filter(t => t.date && t.type === 'income' && t.date.startsWith(monthKey)).reduce((sum, t) => sum + t.amount, 0);
+            const expense = evolutionTransactions.filter(t => t.date && t.type === 'expense' && t.date.startsWith(monthKey)).reduce((sum, t) => sum + t.amount, 0);
             return { month: monthName, Receitas: income, Despesas: expense, Saldo: income - expense };
         });
     }, [transactions, selectedAccount]);
 
+    const generatePDFReport = () => {
+        const doc = new jsPDF();
+        let startY = 22;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(18);
+        doc.text("Relatório Financeiro", 14, startY);
+        startY += 8;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(11);
+        doc.setTextColor(100);
+        doc.text(`Período: ${dateRangeLabel}`, 14, startY);
+        startY += 10;
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(40);
+        doc.text("Resumo do Período", 14, startY);
+        startY += 7;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(`Total de Receitas: ${totalIncome.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`, 14, startY);
+        startY += 6;
+        doc.text(`Total de Despesas: ${totalExpenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`, 14, startY);
+        startY += 6;
+        
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Saldo Líquido: ${netBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`, 14, startY);
+        startY += 12;
+        
+        const tableColumn = ["Data", "Descrição", "Categoria", "Conta", "Tipo", "Valor"];
+        const tableRows: any[] = [];
+        filteredTransactions.forEach(t => {
+            const category = categories.find(c => c.id === t.category);
+            const account = accounts.find(a => a.id === t.accountId);
+            tableRows.push([
+                format(parseISO(t.date), 'dd/MM/yyyy'),
+                t.description,
+                category?.name || 'N/A',
+                account?.name || 'N/A',
+                t.type === 'income' ? 'Receita' : 'Despesa',
+                t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+            ]);
+        });
+
+        doc.autoTable({
+            head: [tableColumn],
+            body: tableRows,
+            startY: startY,
+            theme: 'grid',
+            headStyles: { fillColor: [29, 78, 216], textColor: [255, 255, 255], fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [240, 245, 255] },
+            styles: { fontSize: 9 }
+        });
+
+        doc.save(`Relatorio_WebCash_${dateRangeLabel.replace(/ /g, '_')}.pdf`);
+    };
+    
+    const exportToCSV = () => {
+        const headers = ["Data", "Descrição", "Categoria", "Conta", "Tipo", "Valor"];
+        const escapeCsvCell = (cell: any) => {
+            const str = String(cell ?? '');
+            if (str.includes(',')) return `"${str.replace(/"/g, '""')}"`;
+            return str;
+        };
+        const csvRows = [headers.join(',')];
+        filteredTransactions.forEach(t => {
+            const category = categories.find(c => c.id === t.category);
+            const account = accounts.find(a => a.id === t.accountId);
+            const row = [
+                escapeCsvCell(format(parseISO(t.date), 'dd/MM/yyyy')),
+                escapeCsvCell(t.description),
+                escapeCsvCell(category?.name || 'Sem Categoria'),
+                escapeCsvCell(account?.name || 'N/A'),
+                escapeCsvCell(t.type === 'income' ? 'Receita' : 'Despesa'),
+                t.amount.toString().replace('.', ',')
+            ];
+            csvRows.push(row.join(','));
+        });
+        const csvString = csvRows.join('\n');
+        const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `Relatorio_WebCash_${dateRangeLabel.replace(/ /g, '_')}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
     if (isFinanceLoading) {
         return <div className="flex justify-center items-center h-full p-8"><Loader2 className="w-16 h-16 animate-spin text-primary-600" /></div>
@@ -153,9 +218,6 @@ const Reports: React.FC = () => {
     if (financeError) {
         return <div className="p-4 bg-red-100 text-red-700 rounded-md">Ocorreu um erro: {financeError}</div>
     }
-
-    const generatePDFReport = () => { /* ...seu código de PDF... */ };
-    const exportToCSV = () => { /* ...seu código de CSV... */ };
 
     return (
         <div className="space-y-6">
@@ -226,29 +288,15 @@ const Reports: React.FC = () => {
                         <div className="h-80">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
-                                    <Pie
-                                        data={categoryData}
-                                        cx="50%"
-                                        cy="50%"
-                                        labelLine={false}
-                                        outerRadius={80}
-                                        fill="#8884d8"
-                                        dataKey="value"
-                                        nameKey="name"
-                                        label={({ name, percent }) => `${name} (${percent.toFixed(0)}%)`}
-                                    >
-                                        {categoryData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                        ))}
+                                    <Pie data={categoryData} cx="50%" cy="50%" labelLine={false} outerRadius={80} fill="#8884d8" dataKey="value" nameKey="name" label={({ name, percent }) => `${name} (${percent.toFixed(0)}%)`}>
+                                        {categoryData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
                                     </Pie>
-                                    <Tooltip formatter={(value: number, name: string, props) => [`${value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`, name]} />
+                                    <Tooltip formatter={(value: number) => [value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 'Valor']} />
                                     <Legend />
                                 </PieChart>
                             </ResponsiveContainer>
                         </div>
-                    ) : (
-                        <div className="h-80 flex items-center justify-center text-gray-500 dark:text-gray-400">Nenhuma despesa encontrada no período</div>
-                    )}
+                    ) : (<div className="h-80 flex items-center justify-center text-gray-500 dark:text-gray-400">Nenhuma despesa encontrada no período</div>)}
                 </div>
 
                 <div className="card">
@@ -257,14 +305,8 @@ const Reports: React.FC = () => {
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={monthlyData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                                 <defs>
-                                    <linearGradient id="colorReceitas" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.8} />
-                                        <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                                    </linearGradient>
-                                    <linearGradient id="colorDespesas" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.8} />
-                                        <stop offset="95%" stopColor="#F43F5E" stopOpacity={0} />
-                                    </linearGradient>
+                                    <linearGradient id="colorReceitas" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10B981" stopOpacity={0.8} /><stop offset="95%" stopColor="#10B981" stopOpacity={0} /></linearGradient>
+                                    <linearGradient id="colorDespesas" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#F43F5E" stopOpacity={0.8} /><stop offset="95%" stopColor="#F43F5E" stopOpacity={0} /></linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="month" />
@@ -286,30 +328,28 @@ const Reports: React.FC = () => {
                         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                             <thead className="bg-gray-50 dark:bg-gray-800">
                                 <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Data</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Descrição</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Categoria</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Conta</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tipo</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Valor</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Data</th>
                                 </tr>
                             </thead>
-                            {/* 👇 CORPO DA TABELA RESTAURADO AQUI 👇 */}
                             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                 {filteredTransactions.map(transaction => {
                                     const category = categories.find(cat => String(cat.id) === String(transaction.category))
+                                    const account = accounts.find(acc => String(acc.id) === String(transaction.accountId))
                                     return (
                                         <tr key={transaction.id}>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{transaction.description}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{category?.name}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${transaction.type === 'income' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                                    {transaction.type === 'income' ? 'Receita' : 'Despesa'}
-                                                </span>
-                                            </td>
-                                            <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                                                {transaction.type === 'income' ? '+' : '-'}R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                            </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{format(parseISO(transaction.date), 'dd/MM/yyyy')}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{transaction.description}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{category?.name || 'Sem Categoria'}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{account?.name}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap"><span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${transaction.type === 'income' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{transaction.type === 'income' ? 'Receita' : 'Despesa'}</span></td>
+                                            <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                                                {transaction.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                            </td>
                                         </tr>
                                     )
                                 })}
