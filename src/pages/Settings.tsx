@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import {
-    Moon, Sun, Bell, Shield, Download, Upload, Trash2, User, CreditCard,
-    Target, Settings as SettingsIcon, Edit2, Key, Mail, AlertCircle,
+    Moon, Sun, Bell, Download, Upload, Trash2, User,
+    Edit2, Key, Mail, AlertCircle,
     CheckCircle, Loader2
 } from 'lucide-react';
-import ConfirmationModal from '../components/ConfirmationModal'; // Importe o novo modal
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const Settings: React.FC = () => {
     const { isDark, toggleTheme } = useTheme();
-    const { user, logout, updateProfile, changePassword, resendVerification, resetAccountData } = useAuth();
+    const { user, updateProfile, changePassword, resendVerification, resetAccountData } = useAuth();
     
     const [showEditProfile, setShowEditProfile] = useState(false);
     const [showChangePassword, setShowChangePassword] = useState(false);
@@ -30,22 +30,26 @@ const Settings: React.FC = () => {
         confirmPassword: ''
     });
 
+    // Atualiza o formulário se o usuário for carregado depois
+    useEffect(() => {
+        if (user) {
+            setProfileData({ name: user.name || '', email: user.email || '' });
+        }
+    }, [user]);
+
+
     const handleExportData = () => {
-        // Esta função pode ser implementada para exportar dados do usuário em JSON
         alert('Funcionalidade de exportar dados a ser implementada.');
     };
 
     const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
-        // Esta função pode ser implementada para importar dados de um arquivo JSON
         alert('Funcionalidade de importar dados a ser implementada.');
     };
     
-    // Abre o modal de confirmação
     const handleClearAllData = () => {
         setShowResetConfirm(true);
     };
 
-    // Ação executada após a confirmação no modal
     const confirmResetAllData = async () => {
         setIsUpdating(true);
         setMessage({ type: 'info', text: 'Processando sua solicitação... Por favor, aguarde.' });
@@ -55,26 +59,24 @@ const Settings: React.FC = () => {
         if (result.success) {
             setMessage({ type: 'success', text: 'Seus dados foram removidos com sucesso! Atualizando o dashboard...' });
             setTimeout(() => {
-                window.location.href = '/'; // Redireciona para o dashboard
+                window.location.href = '/';
             }, 2000);
         } else {
             setMessage({ type: 'error', text: `Falha ao limpar os dados. Erro: ${result.error}` });
             setIsUpdating(false);
         }
-        setShowResetConfirm(false); // Fecha o modal
+        setShowResetConfirm(false);
     };
 
     const handleUpdateProfile = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsUpdating(true);
         setMessage(null);
-        // @ts-ignore
         const result = await updateProfile(profileData);
         if (result.success) {
             setMessage({ type: 'success', text: 'Perfil atualizado com sucesso!' });
             setShowEditProfile(false);
         } else {
-            // @ts-ignore
             setMessage({ type: 'error', text: result.error || 'Erro ao atualizar perfil' });
         }
         setIsUpdating(false);
@@ -89,14 +91,12 @@ const Settings: React.FC = () => {
             setIsUpdating(false);
             return;
         }
-        // @ts-ignore
         const result = await changePassword(passwordData.currentPassword, passwordData.newPassword);
         if (result.success) {
             setMessage({ type: 'success', text: 'Senha alterada com sucesso!' });
             setShowChangePassword(false);
             setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
         } else {
-            // @ts-ignore
             setMessage({ type: 'error', text: result.error || 'Erro ao alterar senha' });
         }
         setIsUpdating(false);
@@ -104,12 +104,10 @@ const Settings: React.FC = () => {
 
     const handleResendVerification = async () => {
         setIsUpdating(true);
-        // @ts-ignore
         const result = await resendVerification();
         if (result.success) {
             setMessage({ type: 'success', text: 'Email de verificação enviado!' });
         } else {
-            // @ts-ignore
             setMessage({ type: 'error', text: result.error || 'Erro ao enviar email' });
         }
         setIsUpdating(false);
@@ -155,37 +153,7 @@ const Settings: React.FC = () => {
                 }
             ]
         },
-        {
-            title: 'Segurança',
-            icon: Shield,
-            items: [
-                {
-                    title: 'Alterar Senha',
-                    description: 'Modificar sua senha de acesso',
-                    action: (
-                        <button onClick={() => setShowChangePassword(true)} className="btn-secondary flex items-center gap-2">
-                            <Key className="w-4 h-4" /> Alterar
-                        </button>
-                    )
-                },
-                {
-                    title: 'Verificação de Email',
-                    // @ts-ignore
-                    description: user?.isEmailVerified ? 'Email verificado' : 'Email não verificado',
-                    // @ts-ignore
-                    action: user?.isEmailVerified ? (
-                        <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                            <CheckCircle className="w-4 h-4" />
-                            <span className="text-sm">Verificado</span>
-                        </div>
-                    ) : (
-                        <button onClick={handleResendVerification} disabled={isUpdating} className="btn-secondary flex items-center gap-2 disabled:opacity-50">
-                            <Mail className="w-4 h-4" /> Verificar
-                        </button>
-                    )
-                }
-            ]
-        },
+        // SEÇÃO DE SEGURANÇA REMOVIDA
         {
             title: 'Dados',
             icon: Download,
@@ -231,51 +199,32 @@ const Settings: React.FC = () => {
 
             {message && (
                 <div className={`p-4 rounded-lg flex items-center gap-3 ${
-                    message.type === 'success'
-                        ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-                        : message.type === 'error'
-                           ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-                           : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
-                    }`}>
-                    {message.type === 'success' ? ( <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" /> ) : 
-                     message.type === 'error' ? ( <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" /> ) : 
-                                               ( <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400" /> )}
+                    message.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                    : message.type === 'error' ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+                    : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'}`}>
+                    {message.type === 'success' ? <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" /> : <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />}
                     <p className={`text-sm ${
-                        message.type === 'success'
-                            ? 'text-green-700 dark:text-green-300'
-                            : message.type === 'error'
-                               ? 'text-red-700 dark:text-red-300'
-                               : 'text-blue-700 dark:text-blue-300'
-                        }`}>
+                        message.type === 'success' ? 'text-green-700 dark:text-green-300'
+                        : 'text-red-700 dark:text-red-300'}`}>
                         {message.text}
                     </p>
                 </div>
             )}
 
             <div className="card">
-                <div className="flex items-center justify-between">
+                {/* LAYOUT DO CARD DE PERFIL AJUSTADO PARA RESPONSIVIDADE */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center space-x-4">
-                        <div className="w-16 h-16 bg-primary-600 rounded-full flex items-center justify-center">
+                        <div className="w-16 h-16 bg-primary-600 rounded-full flex items-center justify-center flex-shrink-0">
                             <User className="w-8 h-8 text-white" />
                         </div>
                         <div className="flex-1">
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{user?.name}</h3>
                             <p className="text-gray-600 dark:text-gray-400">{user?.email}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                                <p className="text-sm text-gray-500 dark:text-gray-500">
-                                    {/* @ts-ignore */}
-                                    Conta {user?.role === 'admin' ? 'Administrador' : 'Usuário'}
-                                </p>
-                                {/* @ts-ignore */}
-                                {!user?.isEmailVerified && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
-                                        Email não verificado
-                                    </span>
-                                )}
-                            </div>
+                            {/* INFORMAÇÕES DE CONTA E VERIFICAÇÃO REMOVIDAS */}
                         </div>
                     </div>
-                    <button onClick={() => setShowEditProfile(true)} className="btn-primary flex items-center gap-2">
+                    <button onClick={() => setShowEditProfile(true)} className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto">
                         <Edit2 className="w-4 h-4" /> Editar Perfil
                     </button>
                 </div>
@@ -306,27 +255,7 @@ const Settings: React.FC = () => {
                 );
             })}
 
-            <div className="card">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Ações Rápidas</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <button className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
-                        <CreditCard className="w-8 h-8 text-primary-600 dark:text-primary-400 mx-auto mb-2" />
-                        <p className="font-medium text-gray-900 dark:text-white">Gerenciar Contas</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Adicionar ou editar contas</p>
-                    </button>
-                    <button className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
-                        <Target className="w-8 h-8 text-secondary-600 dark:text-secondary-400 mx-auto mb-2" />
-                        <p className="font-medium text-gray-900 dark:text-white">Definir Metas</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Criar objetivos financeiros</p>
-                    </button>
-                    <button onClick={logout} className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
-                        <SettingsIcon className="w-8 h-8 text-red-600 dark:text-red-400 mx-auto mb-2" />
-                        <p className="font-medium text-red-900 dark:text-red-100">Sair da Conta</p>
-                        <p className="text-sm text-red-600 dark:text-red-400">Fazer logout do sistema</p>
-                    </button>
-                </div>
-            </div>
-
+            {/* MODAIS (EDITAR PERFIL, MUDAR SENHA, CONFIRMAÇÃO) INALTERADOS */}
             {showEditProfile && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md">
