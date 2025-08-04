@@ -12,6 +12,11 @@ export const useFinance = () => {
     return context;
 };
 
+// Tipos para os dados de criação
+type NewAccountData = { name: string; type: Account['type']; color: string; initialBalance: number; };
+type NewCategoryData = Omit<Category, 'id' | 'isActive' | 'createdAt' | 'updatedAt'>;
+type NewTransactionData = Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>;
+
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { user } = useAuth();
 
@@ -23,6 +28,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const [isFinanceLoading, setIsFinanceLoading] = useState(true);
     const [financeError, setFinanceError] = useState<string | null>(null);
 
+    // Função de fetch inicial de todos os dados
     useEffect(() => {
         if (!user) {
             setIsFinanceLoading(false);
@@ -50,21 +56,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 if (goalsRes.error) throw goalsRes.error;
                 if (budgRes.error) throw budgRes.error;
 
-                const adaptedAccounts = (accRes.data || []).map(dbAccount => ({ id: dbAccount.id, name: dbAccount.nome, type: dbAccount.tipo, balance: dbAccount.saldo_inicial || 0, color: dbAccount.cor, isActive: true, createdAt: dbAccount.created_at, updatedAt: dbAccount.created_at }) as Account);
-                const adaptedCategories = (catRes.data || []).map(c => ({ ...c, id: c.id, name: c.nome, type: c.tipo, color: c.cor, icon: c.icone, isActive: true }) as Category);
-                const adaptedGoals = (goalsRes.data || []).map(g => ({ ...g, id: g.id, name: g.nome, targetAmount: g.valor_alvo, currentAmount: g.valor_atual, targetDate: g.data_alvo, isCompleted: g.valor_atual >= g.valor_alvo, createdAt: g.created_at }) as Goal);
-                const adaptedBudgets = (budgRes.data || []).map(b => ({ ...b, categoryId: b.categoria_id, amount: b.valor, spent: 0, alertThreshold: 0.8, createdAt: b.created_at }) as Budget);
+                const adaptedAccounts = (accRes.data || []).map(db => ({ id: db.id, name: db.nome, type: db.tipo, balance: db.saldo_inicial || 0, color: db.cor, isActive: true, createdAt: db.created_at, updatedAt: db.updated_at }) as Account);
+                const adaptedCategories = (catRes.data || []).map(db => ({ id: db.id, name: db.nome, type: db.tipo, color: db.cor, icon: db.icone, isActive: true, createdAt: db.created_at, updatedAt: db.updated_at }) as Category);
+                const adaptedGoals = (goalsRes.data || []).map(db => ({ ...db, id: db.id, name: db.nome, targetAmount: db.valor_alvo, currentAmount: db.valor_atual, targetDate: db.data_alvo, isCompleted: db.valor_atual >= db.valor_alvo, createdAt: db.created_at }) as Goal);
+                const adaptedBudgets = (budgRes.data || []).map(db => ({ ...db, categoryId: db.categoria_id, amount: db.valor, spent: 0, alertThreshold: 0.8, createdAt: db.created_at }) as Budget);
 
-                const adaptedDespesas = (despRes.data || []).map(t => ({ ...t, type: 'expense', amount: t.valor, accountId: t.conta_id, category: t.categoria_id, recurrence: 'none', updatedAt: t.created_at, createdAt: t.created_at, description: t.descricao, date: t.data }) as Transaction);
-                const adaptedReceitas = (recRes.data || []).map(t => ({ ...t, type: 'income', amount: t.valor, accountId: t.conta_id, category: t.categoria_id, recurrence: 'none', updatedAt: t.created_at, createdAt: t.created_at, description: t.descricao, date: t.data }) as Transaction);
+                const adaptedDespesas = (despRes.data || []).map(db => ({ ...db, type: 'expense', amount: db.valor, accountId: db.conta_id, category: db.categoria_id, recurrence: 'none', description: db.descricao, date: db.data }) as Transaction);
+                const adaptedReceitas = (recRes.data || []).map(db => ({ ...db, type: 'income', amount: db.valor, accountId: db.conta_id, category: db.categoria_id, recurrence: 'none', description: db.descricao, date: db.data }) as Transaction);
                 const allTransactions = [...adaptedDespesas, ...adaptedReceitas];
 
                 const accountsWithRealBalance = adaptedAccounts.map(account => {
                     const balance = allTransactions
                         .filter(t => String(t.accountId) === String(account.id))
-                        .reduce((acc, curr) => {
-                            return curr.type === 'income' ? acc + curr.amount : acc - curr.amount;
-                        }, account.balance);
+                        .reduce((acc, curr) => curr.type === 'income' ? acc + curr.amount : acc - curr.amount, account.balance);
                     return { ...account, balance };
                 });
 
@@ -84,68 +88,117 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         fetchData();
     }, [user]);
 
-    // Funções de Contas, Categorias e Transações (sem alterações)
-    const addAccount = async (account: Omit<Account, 'id' | 'balance' | 'createdAt' | 'updatedAt'>): Promise<boolean> => { /* ...código inalterado... */ return false };
-    const updateAccount = async (id: string, updatedFields: Partial<Account>): Promise<boolean> => { /* ...código inalterado... */ return false };
-    const deleteAccount = async (id: string): Promise<boolean> => { /* ...código inalterado... */ return false };
-    const addCategory = async (category: Omit<Category, 'id' | 'isActive'>): Promise<boolean> => { /* ...código inalterado... */ return false };
-    const updateCategory = async (id: string, updatedFields: Partial<Category>): Promise<boolean> => { /* ...código inalterado... */ return false };
-    const deleteCategory = async (id: string): Promise<boolean> => { /* ...código inalterado... */ return false };
-    const addTransaction = async (transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>): Promise<boolean> => { /* ...código inalterado... */ return false };
-    const deleteTransaction = async (id: string): Promise<boolean> => { /* ...código inalterado... */ return false };
-
-    // 👇 --- FUNÇÕES DE METAS IMPLEMENTADAS --- 👇
-
-    const addGoal = async (goal: Pick<Goal, 'name' | 'targetAmount'>): Promise<boolean> => {
-        if (!user) return false;
-        try {
-            const { data, error } = await supabase.from('metas').insert({
-                nome: goal.name,
-                valor_alvo: goal.targetAmount,
-                valor_atual: 0,
-                usuario_id: user.id
-            }).select().single();
-            if (error) throw error;
-            const newGoal: Goal = { ...data, id: data.id, name: data.nome, targetAmount: data.valor_alvo, currentAmount: data.valor_atual, targetDate: data.data_alvo, isCompleted: false, createdAt: data.created_at };
-            setGoals(prev => [...prev, newGoal]);
-            return true;
-        } catch (error: any) {
-            console.error("Erro ao adicionar meta:", error.message);
-            return false;
-        }
+    // --- FUNÇÕES DE CONTA ---
+    const addAccount = async (accountData: NewAccountData) => {
+        if (!user) throw new Error("Usuário não autenticado.");
+        const { data, error } = await supabase.from('contas').insert({ nome: accountData.name, tipo: accountData.type, cor: accountData.color, saldo_inicial: accountData.initialBalance, usuario_id: user.id }).select().single();
+        if (error) throw error;
+        const newAccount: Account = { id: data.id, name: data.nome, type: data.tipo, balance: data.saldo_inicial, color: data.cor, isActive: true, createdAt: data.created_at, updatedAt: data.updated_at };
+        setAccounts(prev => [...prev, newAccount]);
     };
 
-    const updateGoal = async (id: string, updatedFields: Partial<Pick<Goal, 'name' | 'targetAmount' | 'currentAmount'>>): Promise<boolean> => {
-        if (!user) return false;
-        try {
-            const { data, error } = await supabase.from('metas').update({
-                nome: updatedFields.name,
-                valor_alvo: updatedFields.targetAmount,
-                valor_atual: updatedFields.currentAmount
-            }).eq('id', id).select().single();
-            if (error) throw error;
-            const updatedGoal: Goal = { ...data, id: data.id, name: data.nome, targetAmount: data.valor_alvo, currentAmount: data.valor_atual, targetDate: data.data_alvo, isCompleted: data.valor_atual >= data.valor_alvo, createdAt: data.created_at };
-            setGoals(prev => prev.map(g => g.id === id ? updatedGoal : g));
-            return true;
-        } catch (error: any) {
-            console.error("Erro ao atualizar meta:", error.message);
-            return false;
-        }
+    const updateAccount = async (id: string, updatedFields: Partial<Account>) => {
+        if (!user) throw new Error("Usuário não autenticado.");
+        const { data, error } = await supabase.from('contas').update({ nome: updatedFields.name, tipo: updatedFields.type, cor: updatedFields.color }).eq('id', id).select().single();
+        if (error) throw error;
+        setAccounts(prev => prev.map(acc => acc.id === id ? { ...acc, name: data.nome, type: data.tipo, color: data.cor, updatedAt: data.updated_at } : acc));
     };
 
-    const deleteGoal = async (id: string): Promise<boolean> => {
-        if (!user) return false;
-        try {
-            const { error } = await supabase.from('metas').delete().match({ id });
-            if (error) throw error;
-            setGoals(prev => prev.filter(g => g.id !== id));
-            return true;
-        } catch (error: any) {
-            console.error("Erro ao deletar meta:", error.message);
-            return false;
-        }
+    const deleteAccount = async (id: string) => {
+        if (!user) throw new Error("Usuário não autenticado.");
+        // Adicionar lógica para lidar com transações associadas se necessário
+        const { error } = await supabase.from('contas').delete().match({ id });
+        if (error) throw error;
+        setAccounts(prev => prev.filter(acc => acc.id !== id));
+    };
+    
+    // --- FUNÇÕES DE CATEGORIA ---
+    const addCategory = async (categoryData: NewCategoryData) => {
+        if (!user) throw new Error("Usuário não autenticado.");
+        const { data, error } = await supabase.from('categorias').insert({ nome: categoryData.name, tipo: categoryData.type, icone: categoryData.icon, cor: categoryData.color, usuario_id: user.id }).select().single();
+        if (error) throw error;
+        const newCategory: Category = { id: data.id, name: data.nome, type: data.tipo, icon: data.icone, color: data.cor, isActive: true, createdAt: data.created_at, updatedAt: data.updated_at };
+        setCategories(prev => [...prev, newCategory]);
     };
 
+    const updateCategory = async (id: string, updatedFields: Partial<Category>) => {
+        if (!user) throw new Error("Usuário não autenticado.");
+        const { data, error } = await supabase.from('categorias').update({ nome: updatedFields.name, tipo: updatedFields.type, icone: updatedFields.icon, cor: updatedFields.color }).eq('id', id).select().single();
+        if (error) throw error;
+        setCategories(prev => prev.map(cat => cat.id === id ? { ...cat, name: data.nome, type: data.tipo, icon: data.icone, color: data.cor, updatedAt: data.updated_at } : cat));
+    };
+
+    const deleteCategory = async (id: string) => {
+        if (!user) throw new Error("Usuário não autenticado.");
+        
+        // 1. Desassocia transações (despesas)
+        const { error: expenseError } = await supabase.from('despesas').update({ categoria_id: null }).eq('categoria_id', id);
+        if (expenseError) throw new Error("Falha ao atualizar despesas associadas.");
+
+        // 2. Desassocia transações (receitas)
+        const { error: incomeError } = await supabase.from('receitas').update({ categoria_id: null }).eq('categoria_id', id);
+        if (incomeError) throw new Error("Falha ao atualizar receitas associadas.");
+
+        // 3. Apaga a categoria
+        const { error: deleteError } = await supabase.from('categorias').delete().match({ id });
+        if (deleteError) throw deleteError;
+
+        // 4. Atualiza o estado local
+        setCategories(prev => prev.filter(cat => cat.id !== id));
+        setTransactions(prev => prev.map(t => t.category === id ? { ...t, category: null } : t));
+    };
+    
+    // --- FUNÇÕES DE TRANSAÇÃO ---
+    const addTransaction = async (transaction: NewTransactionData) => {
+        if (!user) throw new Error("Usuário não autenticado.");
+        const tableName = transaction.type === 'income' ? 'receitas' : 'despesas';
+        const { data, error } = await supabase.from(tableName).insert({ descricao: transaction.description, valor: transaction.amount, data: transaction.date, conta_id: transaction.accountId, categoria_id: transaction.category, usuario_id: user.id }).select().single();
+        if (error) throw error;
+        const newTransaction: Transaction = { id: data.id, type: transaction.type, amount: data.valor, description: data.descricao, category: data.categoria_id, accountId: data.conta_id, date: data.data, recurrence: transaction.recurrence, createdAt: data.created_at, updatedAt: data.created_at };
+        setTransactions(prev => [...prev, newTransaction]);
+        setAccounts(prev => prev.map(acc => acc.id === newTransaction.accountId ? { ...acc, balance: newTransaction.type === 'income' ? acc.balance + newTransaction.amount : acc.balance - newTransaction.amount } : acc));
+    };
+
+    const updateTransaction = async (id: string, updatedFields: Partial<Transaction>) => {
+        if (!user) throw new Error("Usuário não autenticado.");
+        const originalTransaction = transactions.find(t => t.id === id);
+        if (!originalTransaction) throw new Error("Transação original não encontrada.");
+        const tableName = originalTransaction.type === 'income' ? 'receitas' : 'despesas';
+        const { data, error } = await supabase.from(tableName).update({ descricao: updatedFields.description, valor: updatedFields.amount, data: updatedFields.date, conta_id: updatedFields.accountId, categoria_id: updatedFields.category }).eq('id', id).select().single();
+        if (error) throw error;
+        const updatedTransaction: Transaction = { ...originalTransaction, ...updatedFields, updatedAt: data.updated_at };
+        setTransactions(prev => prev.map(t => t.id === id ? updatedTransaction : t));
+        setAccounts(prevAccounts => {
+            return prevAccounts.map(acc => {
+                let newBalance = acc.balance;
+                if (acc.id === originalTransaction.accountId) {
+                    newBalance += originalTransaction.type === 'income' ? -originalTransaction.amount : originalTransaction.amount;
+                }
+                if (acc.id === updatedTransaction.accountId) {
+                    newBalance += updatedTransaction.type === 'income' ? updatedTransaction.amount : -updatedTransaction.amount;
+                }
+                return { ...acc, balance: newBalance };
+            });
+        });
+    };
+    
+    const deleteTransaction = async (id: string) => {
+        if (!user) throw new Error("Usuário não autenticado.");
+        const transactionToDelete = transactions.find(t => t.id === id);
+        if (!transactionToDelete) throw new Error("Transação não encontrada.");
+        const tableName = transactionToDelete.type === 'income' ? 'receitas' : 'despesas';
+        const { error } = await supabase.from(tableName).delete().match({ id });
+        if (error) throw error;
+        setTransactions(prev => prev.filter(t => t.id !== id));
+        setAccounts(prev => prev.map(acc => acc.id === transactionToDelete.accountId ? { ...acc, balance: transactionToDelete.type === 'income' ? acc.balance - transactionToDelete.amount : acc.balance + transactionToDelete.amount } : acc));
+    };
+
+    // --- FUNÇÕES DE METAS (STUBS) ---
+    const addGoal = async (goal: Pick<Goal, 'name' | 'targetAmount' | 'targetDate'>) => { console.log('addGoal não implementado'); };
+    const updateGoal = async (id: string, updatedFields: Partial<Pick<Goal, 'name' | 'targetAmount' | 'currentAmount'>>) => { console.log('updateGoal não implementado'); };
+    const deleteGoal = async (id: string) => { console.log('deleteGoal não implementado'); };
+
+    // --- FUNÇÕES DE CÁLCULO ---
     const getTotalBalance = useCallback(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
     const getMonthlyIncome = useCallback((month = format(new Date(), 'yyyy-MM')) => transactions.filter(t => t.date && t.type === 'income' && t.date.startsWith(month)).reduce((sum, t) => sum + t.amount, 0), [transactions]);
     const getMonthlyExpenses = useCallback((month = format(new Date(), 'yyyy-MM')) => transactions.filter(t => t.date && t.type === 'expense' && t.date.startsWith(month)).reduce((sum, t) => sum + t.amount, 0), [transactions]);
@@ -153,10 +206,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const value: FinanceContextType = {
         transactions, accounts, categories, budgets, goals,
         isFinanceLoading, financeError,
-        addTransaction, deleteTransaction,
+        addTransaction, updateTransaction, deleteTransaction,
         addAccount, updateAccount, deleteAccount,
         addCategory, updateCategory, deleteCategory,
-        // 👇 Funções de metas adicionadas ao contexto
         addGoal, updateGoal, deleteGoal,
         getTotalBalance, getMonthlyIncome, getMonthlyExpenses,
     };

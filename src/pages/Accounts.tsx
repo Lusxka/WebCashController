@@ -6,11 +6,13 @@ import {
     Loader2, AlertCircle 
 } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
+import CurrencyInput from 'react-currency-input-field';
 
 type AccountFormData = {
     name: string;
     type: Account['type'];
     color: string;
+    initialBalance: string | undefined; // Saldo inicial como string para o input
 }
 
 const Accounts: React.FC = () => {
@@ -23,13 +25,19 @@ const Accounts: React.FC = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
 
-    const initialFormState: AccountFormData = { name: '', type: 'bank', color: '#3B82F6' };
+    const initialFormState: AccountFormData = { name: '', type: 'bank', color: '#3B82F6', initialBalance: '0' };
     const [formData, setFormData] = useState<AccountFormData>(initialFormState);
 
     useEffect(() => {
         if (showAddModal) {
             if (editingAccount) {
-                setFormData({ name: editingAccount.name, type: editingAccount.type, color: editingAccount.color });
+                // Ao editar, não pedimos saldo inicial, pois ele não deve ser alterado.
+                setFormData({ 
+                    name: editingAccount.name, 
+                    type: editingAccount.type, 
+                    color: editingAccount.color,
+                    initialBalance: editingAccount.balance.toString() // Apenas para exibição, não será editado
+                });
             } else {
                 setFormData(initialFormState);
             }
@@ -46,21 +54,36 @@ const Accounts: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.name.trim()) return;
+        if (!formData.name.trim()) {
+            setFormError("O nome da conta é obrigatório.");
+            return;
+        }
         
         setIsSubmitting(true);
         setFormError(null);
         
-        const success = editingAccount 
-            ? await updateAccount(editingAccount.id, formData)
-            // @ts-ignore
-            : await addAccount({ ...formData, isActive: true });
-
-        setIsSubmitting(false);
-        if (success) {
+        try {
+            if (editingAccount) {
+                await updateAccount(editingAccount.id, {
+                    name: formData.name,
+                    type: formData.type,
+                    color: formData.color,
+                });
+            } else {
+                const numericBalance = parseFloat((formData.initialBalance || '0').replace(/\./g, '').replace(',', '.'));
+                await addAccount({
+                    name: formData.name,
+                    type: formData.type,
+                    color: formData.color,
+                    initialBalance: numericBalance,
+                });
+            }
             resetForm();
-        } else {
-            setFormError("Não foi possível salvar a conta. Verifique a consola do navegador (F12) para mais detalhes.");
+        } catch (error: any) {
+            console.error("ERRO DETALHADO AO SALVAR CONTA:", error);
+            setFormError(error.message || "Não foi possível salvar a conta. Tente novamente.");
+        } finally {
+            setIsSubmitting(false);
         }
     }
 
@@ -76,9 +99,14 @@ const Accounts: React.FC = () => {
 
     const confirmDelete = async () => {
         if (accountToDelete) {
-            await deleteAccount(accountToDelete);
-            setAccountToDelete(null);
-            setShowDeleteConfirm(false);
+            try {
+                await deleteAccount(accountToDelete);
+            } catch (error: any) {
+                setFormError(error.message || "Erro ao deletar conta.");
+            } finally {
+                setAccountToDelete(null);
+                setShowDeleteConfirm(false);
+            }
         }
     };
 
@@ -86,6 +114,7 @@ const Accounts: React.FC = () => {
         setShowAddModal(false);
         setEditingAccount(null);
         setFormError(null);
+        setFormData(initialFormState);
     }
 
     const getAccountIcon = (type: Account['type']) => accountTypes.find(t => t.value === type)?.icon || Wallet;
@@ -169,6 +198,26 @@ const Accounts: React.FC = () => {
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome da Conta *</label>
                                     <input type="text" value={formData.name} onChange={(e) => setFormData(f => ({ ...f, name: e.target.value }))} className="input-field" required disabled={isSubmitting} />
                                 </div>
+                                
+                                {!editingAccount && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Saldo Inicial</label>
+                                        <CurrencyInput
+                                            id="initial-balance"
+                                            name="initialBalance"
+                                            className="input-field"
+                                            placeholder="R$ 0,00"
+                                            value={formData.initialBalance}
+                                            onValueChange={(value) => setFormData(f => ({ ...f, initialBalance: value }))}
+                                            prefix="R$ "
+                                            groupSeparator="."
+                                            decimalSeparator=","
+                                            decimalsLimit={2}
+                                            disabled={isSubmitting}
+                                        />
+                                    </div>
+                                )}
+
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo de Conta</label>
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
