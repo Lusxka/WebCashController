@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useFinance } from '../contexts/FinanceContext';
 import {
     Moon, Sun, Bell, Download, Upload, Trash2, User,
     Edit2, Key, Mail, AlertCircle,
@@ -11,6 +12,17 @@ import ConfirmationModal from '../components/ConfirmationModal';
 const Settings: React.FC = () => {
     const { isDark, toggleTheme } = useTheme();
     const { user, updateProfile, changePassword, resendVerification, resetAccountData } = useAuth();
+    const { 
+        accounts, 
+        categories, 
+        transactions, 
+        goals, 
+        budgets,
+        addAccount,
+        addCategory, 
+        addTransaction,
+        addGoal
+    } = useFinance();
     
     const [showEditProfile, setShowEditProfile] = useState(false);
     const [showChangePassword, setShowChangePassword] = useState(false);
@@ -37,13 +49,234 @@ const Settings: React.FC = () => {
         }
     }, [user]);
 
+    // 🔥 FUNÇÃO DE EXPORTAR DADOS
+    const handleExportData = async () => {
+        try {
+            setIsUpdating(true);
+            setMessage({ type: 'info', text: 'Preparando exportação dos dados...' });
 
-    const handleExportData = () => {
-        alert('Funcionalidade de exportar dados a ser implementada.');
+            // Preparar dados para exportação
+            const exportData = {
+                metadata: {
+                    exportDate: new Date().toISOString(),
+                    version: '1.0',
+                    userId: user?.id,
+                    userName: user?.name,
+                    totalAccounts: accounts.length,
+                    totalCategories: categories.length,
+                    totalTransactions: transactions.length,
+                    totalGoals: goals.length,
+                    totalBudgets: budgets.length
+                },
+                accounts: accounts.map(account => ({
+                    id: account.id,
+                    name: account.name,
+                    type: account.type,
+                    balance: account.balance,
+                    color: account.color,
+                    isActive: account.isActive,
+                    createdAt: account.createdAt,
+                    updatedAt: account.updatedAt
+                })),
+                categories: categories.map(category => ({
+                    id: category.id,
+                    name: category.name,
+                    type: category.type,
+                    icon: category.icon,
+                    color: category.color,
+                    isActive: category.isActive,
+                    createdAt: category.createdAt,
+                    updatedAt: category.updatedAt
+                })),
+                transactions: transactions.map(transaction => ({
+                    id: transaction.id,
+                    type: transaction.type,
+                    amount: transaction.amount,
+                    description: transaction.description,
+                    category: transaction.category,
+                    accountId: transaction.accountId,
+                    date: transaction.date,
+                    recurrence: transaction.recurrence,
+                    createdAt: transaction.createdAt,
+                    updatedAt: transaction.updatedAt
+                })),
+                goals: goals.map(goal => ({
+                    id: goal.id,
+                    name: goal.name,
+                    targetAmount: goal.targetAmount,
+                    currentAmount: goal.currentAmount,
+                    targetDate: goal.targetDate,
+                    isCompleted: goal.isCompleted,
+                    createdAt: goal.createdAt,
+                    updatedAt: goal.updatedAt
+                })),
+                budgets: budgets.map(budget => ({
+                    id: budget.id,
+                    categoryId: budget.categoryId,
+                    amount: budget.amount,
+                    spent: budget.spent,
+                    alertThreshold: budget.alertThreshold,
+                    createdAt: budget.createdAt
+                }))
+            };
+
+            // Criar e baixar arquivo
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `webcash-backup-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            setMessage({ 
+                type: 'success', 
+                text: `Dados exportados com sucesso! ${transactions.length} transações, ${accounts.length} contas, ${categories.length} categorias e ${goals.length} metas foram incluídas no backup.` 
+            });
+
+        } catch (error: any) {
+            console.error('Erro ao exportar dados:', error);
+            setMessage({ 
+                type: 'error', 
+                text: `Erro ao exportar dados: ${error.message}` 
+            });
+        } finally {
+            setIsUpdating(false);
+        }
     };
 
-    const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
-        alert('Funcionalidade de importar dados a ser implementada.');
+    // 🔥 FUNÇÃO DE IMPORTAR DADOS
+    const handleImportData = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        // Reset input para permitir selecionar o mesmo arquivo novamente
+        event.target.value = '';
+
+        try {
+            setIsUpdating(true);
+            setMessage({ type: 'info', text: 'Lendo arquivo de backup...' });
+
+            const fileText = await file.text();
+            const importData = JSON.parse(fileText);
+
+            // Validar estrutura do arquivo
+            if (!importData.metadata || !importData.accounts || !importData.categories || !importData.transactions) {
+                throw new Error('Arquivo de backup inválido. Estrutura não reconhecida.');
+            }
+
+            setMessage({ type: 'info', text: 'Importando dados... Isso pode levar alguns momentos.' });
+
+            let importedCounts = {
+                accounts: 0,
+                categories: 0,
+                transactions: 0,
+                goals: 0
+            };
+
+            // Importar contas
+            if (importData.accounts && Array.isArray(importData.accounts)) {
+                for (const account of importData.accounts) {
+                    try {
+                        await addAccount({
+                            name: account.name,
+                            type: account.type,
+                            color: account.color,
+                            initialBalance: account.balance || 0
+                        });
+                        importedCounts.accounts++;
+                    } catch (error) {
+                        console.warn('Erro ao importar conta:', account.name, error);
+                    }
+                }
+            }
+
+            // Importar categorias
+            if (importData.categories && Array.isArray(importData.categories)) {
+                for (const category of importData.categories) {
+                    try {
+                        await addCategory({
+                            name: category.name,
+                            type: category.type,
+                            icon: category.icon,
+                            color: category.color
+                        });
+                        importedCounts.categories++;
+                    } catch (error) {
+                        console.warn('Erro ao importar categoria:', category.name, error);
+                    }
+                }
+            }
+
+            // Aguardar um pouco para as contas e categorias serem criadas
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Importar transações
+            if (importData.transactions && Array.isArray(importData.transactions)) {
+                for (const transaction of importData.transactions) {
+                    try {
+                        // Tentar encontrar conta correspondente pelo nome
+                        const matchingAccount = accounts.find(acc => acc.name === 
+                            importData.accounts.find((impAcc: any) => impAcc.id === transaction.accountId)?.name
+                        );
+
+                        // Tentar encontrar categoria correspondente pelo nome
+                        let matchingCategory = null;
+                        if (transaction.category) {
+                            const categoryName = importData.categories.find((impCat: any) => impCat.id === transaction.category)?.name;
+                            matchingCategory = categories.find(cat => cat.name === categoryName);
+                        }
+
+                        if (matchingAccount) {
+                            await addTransaction({
+                                type: transaction.type,
+                                amount: transaction.amount,
+                                description: transaction.description,
+                                category: matchingCategory?.id || null,
+                                accountId: matchingAccount.id,
+                                date: transaction.date,
+                                recurrence: transaction.recurrence || 'none'
+                            });
+                            importedCounts.transactions++;
+                        }
+                    } catch (error) {
+                        console.warn('Erro ao importar transação:', transaction.description, error);
+                    }
+                }
+            }
+
+            // Importar metas
+            if (importData.goals && Array.isArray(importData.goals)) {
+                for (const goal of importData.goals) {
+                    try {
+                        await addGoal({
+                            name: goal.name,
+                            targetAmount: goal.targetAmount,
+                            targetDate: goal.targetDate
+                        });
+                        importedCounts.goals++;
+                    } catch (error) {
+                        console.warn('Erro ao importar meta:', goal.name, error);
+                    }
+                }
+            }
+
+            setMessage({ 
+                type: 'success', 
+                text: `Importação concluída! ${importedCounts.accounts} contas, ${importedCounts.categories} categorias, ${importedCounts.transactions} transações e ${importedCounts.goals} metas foram importadas.` 
+            });
+
+        } catch (error: any) {
+            console.error('Erro ao importar dados:', error);
+            setMessage({ 
+                type: 'error', 
+                text: `Erro ao importar dados: ${error.message}` 
+            });
+        } finally {
+            setIsUpdating(false);
+        }
     };
     
     const handleClearAllData = () => {
@@ -153,7 +386,6 @@ const Settings: React.FC = () => {
                 }
             ]
         },
-        // SEÇÃO DE SEGURANÇA REMOVIDA
         {
             title: 'Dados',
             icon: Download,
@@ -162,8 +394,17 @@ const Settings: React.FC = () => {
                     title: 'Exportar Dados',
                     description: 'Fazer backup de todas as informações',
                     action: (
-                        <button onClick={handleExportData} className="btn-secondary flex items-center gap-2">
-                            <Download className="w-4 h-4" /> Exportar
+                        <button 
+                            onClick={handleExportData} 
+                            disabled={isUpdating}
+                            className="btn-secondary flex items-center gap-2 disabled:opacity-50"
+                        >
+                            {isUpdating ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Download className="w-4 h-4" />
+                            )}
+                            Exportar
                         </button>
                     )
                 },
@@ -172,8 +413,19 @@ const Settings: React.FC = () => {
                     description: 'Restaurar backup anterior',
                     action: (
                         <label className="btn-secondary flex items-center gap-2 cursor-pointer">
-                            <Upload className="w-4 h-4" /> Importar
-                            <input type="file" accept=".json" onChange={handleImportData} className="hidden" />
+                            {isUpdating ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Upload className="w-4 h-4" />
+                            )}
+                            Importar
+                            <input 
+                                type="file" 
+                                accept=".json" 
+                                onChange={handleImportData} 
+                                className="hidden"
+                                disabled={isUpdating}
+                            />
                         </label>
                     )
                 },
@@ -181,7 +433,11 @@ const Settings: React.FC = () => {
                     title: 'Limpar Todos os Dados',
                     description: 'Remover permanentemente todas as informações',
                     action: (
-                        <button onClick={handleClearAllData} className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2">
+                        <button 
+                            onClick={handleClearAllData} 
+                            disabled={isUpdating}
+                            className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 disabled:opacity-50"
+                        >
                             <Trash2 className="w-4 h-4" /> Limpar Tudo
                         </button>
                     )
@@ -205,14 +461,14 @@ const Settings: React.FC = () => {
                     {message.type === 'success' ? <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" /> : <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />}
                     <p className={`text-sm ${
                         message.type === 'success' ? 'text-green-700 dark:text-green-300'
-                        : 'text-red-700 dark:text-red-300'}`}>
+                        : message.type === 'error' ? 'text-red-700 dark:text-red-300'
+                        : 'text-blue-700 dark:text-blue-300'}`}>
                         {message.text}
                     </p>
                 </div>
             )}
 
             <div className="card">
-                {/* LAYOUT DO CARD DE PERFIL AJUSTADO PARA RESPONSIVIDADE */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center space-x-4">
                         <div className="w-16 h-16 bg-primary-600 rounded-full flex items-center justify-center flex-shrink-0">
@@ -221,7 +477,6 @@ const Settings: React.FC = () => {
                         <div className="flex-1">
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{user?.name}</h3>
                             <p className="text-gray-600 dark:text-gray-400">{user?.email}</p>
-                            {/* INFORMAÇÕES DE CONTA E VERIFICAÇÃO REMOVIDAS */}
                         </div>
                     </div>
                     <button onClick={() => setShowEditProfile(true)} className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto">
