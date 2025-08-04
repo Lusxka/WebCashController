@@ -1,125 +1,132 @@
 import React, { useMemo } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { 
-  Home, 
-  CreditCard, 
-  Wallet, 
-  BarChart3, 
-  Settings,
-  Plus,
-  LogOut,
-  User,
-  Tag
+import {
+    Home,
+    CreditCard,
+    Wallet,
+    BarChart3,
+    Settings,
+    LogOut,
+    User,
+    Tag
 } from 'lucide-react';
 
 interface LayoutProps {
-  children: React.ReactNode;
+    children: React.ReactNode;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { user, logout } = useAuth();
+    const location = useLocation();
+    const navigate = useNavigate();
+    const { user, logout } = useAuth();
 
-  const navItems = [
-    { path: '/', icon: Home, label: 'Início' },
-    { path: '/transacoes', icon: CreditCard, label: 'Transações' },
-    { path: '/contas', icon: Wallet, label: 'Contas' },
-    { path: '/categorias', icon: Tag, label: 'Categorias' },
-    { path: '/relatorios', icon: BarChart3, label: 'Relatórios' },
-  ];
-  
-  const settingsItem = { path: '/configuracoes', icon: Settings, label: 'Config' };
+    const navItems = [
+        { path: '/', icon: Home, label: 'Início' },
+        { path: '/transacoes', icon: CreditCard, label: 'Transações' },
+        { path: '/contas', icon: Wallet, label: 'Contas' },
+        { path: '/categorias', icon: Tag, label: 'Categorias' },
+        { path: '/relatorios', icon: BarChart3, label: 'Relatórios' },
+    ];
 
-  const abbreviatedUserName = useMemo(() => {
-    const fullName = user?.name;
-    if (!fullName) return '';
-    
-    const parts = fullName.trim().split(' ').filter(p => p);
-    
-    if (parts.length > 1) {
-      return `${parts[0]} ${parts[parts.length - 1]}`;
-    }
-    
-    return fullName;
-  }, [user?.name]);
+    const settingsItem = { path: '/configuracoes', icon: Settings, label: 'Config' };
 
-  const handleLogout = () => {
-    if (confirm('Tem certeza que deseja sair?')) {
-      logout();
-    }
-  };
+    const abbreviatedUserName = useMemo(() => {
+        const fullName = user?.name;
+        if (!fullName) return '';
+        const parts = fullName.trim().split(' ').filter(p => p);
+        if (parts.length > 1) {
+            return `${parts[0]} ${parts[parts.length - 1]}`;
+        }
+        return fullName;
+    }, [user?.name]);
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20 lg:pb-0">
-      <header className="sticky top-0 z-50 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            
-            <div className="flex items-center">
-              <h1 className="text-xl font-bold text-primary-600 dark:text-primary-400">WebCash</h1>
-            </div>
-            
-            <nav className="hidden lg:flex space-x-4">
-              {[...navItems, settingsItem].map((item) => {
-                const Icon = item.icon;
-                return (
-                  <NavLink key={item.path} to={item.path} className={({ isActive }) => `flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${ isActive ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' }`}>
-                    <Icon className="w-5 h-5 mr-2" />
-                    {item.label}
-                  </NavLink>
-                );
-              })}
+    const handleLogout = () => {
+        if (confirm('Tem certeza que deseja sair?')) {
+            logout();
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20 lg:pb-0">
+            <header className="sticky top-0 z-50 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex justify-between items-center h-16">
+
+                        <div className="flex items-center">
+                            <Link to="/" className="flex items-center">
+                                <div className="rounded-full overflow-hidden h-12 w-12">
+                                    <img
+                                        src="https://github.com/Lusxka/WebCashController/blob/main/src/img/logo.png?raw=true"
+                                        alt="WebCash Logo"
+                                        className="object-cover h-full w-full"
+                                    />
+                                </div>
+                            </Link>
+
+                            {/* Alterado de ml-10 para ml-14 */}
+                            <nav className="hidden lg:flex space-x-4 ml-14">
+                                {navItems.map((item) => {
+                                    const Icon = item.icon;
+                                    return (
+                                        <NavLink key={item.path} to={item.path} className={({ isActive }) => `flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${ isActive ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' }`}>
+                                            <Icon className="w-5 h-5 mr-2" />
+                                            {item.label}
+                                        </NavLink>
+                                    );
+                                })}
+                            </nav>
+                        </div>
+
+                        <div className="flex items-center space-x-2 sm:space-x-4">
+                            <NavLink to={settingsItem.path} className={({ isActive }) => `hidden lg:flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${ isActive ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' }`}>
+                                <Settings className="w-5 h-5 mr-2" />
+                                Config
+                            </NavLink>
+
+                            <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
+                                    <User className="w-4 h-4 text-white" />
+                                </div>
+                                <div className="text-sm hidden sm:block">
+                                    <p className="font-medium text-gray-900 dark:text-white truncate">
+                                        {abbreviatedUserName}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button onClick={() => navigate('/configuracoes')} className="lg:hidden p-2 text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400">
+                                <Settings className="w-5 h-5" />
+                            </button>
+
+                            <button onClick={handleLogout} className="p-2 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors" title="Sair">
+                                <LogOut className="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                {children}
+            </main>
+
+            <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex justify-around items-center h-16">
+                    {navItems.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = location.pathname === item.path;
+                        return (
+                            <NavLink key={item.path} to={item.path} className={`flex flex-col items-center justify-center w-full h-full transition-colors ${ isActive ? 'text-primary-600 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                                <Icon className="w-6 h-6" />
+                                <span className="text-xs mt-1 font-medium">{item.label}</span>
+                            </NavLink>
+                        );
+                    })}
+                </div>
             </nav>
-
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-white" />
-                </div>
-                <div className="text-sm hidden sm:block">
-                  <p className="font-medium text-gray-900 dark:text-white truncate">
-                    {abbreviatedUserName}
-                  </p>
-                 
-                </div>
-              </div>
-              
-              <button onClick={() => navigate('/configuracoes')} className="lg:hidden p-2 text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400">
-                <Settings className="w-5 h-5" />
-              </button>
-              
-              <button onClick={handleLogout} className="p-2 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors" title="Sair">
-                <LogOut className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
         </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {children}
-      </main>
-
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex justify-around items-center h-16">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
-            return (
-              <NavLink key={item.path} to={item.path} className={`flex flex-col items-center justify-center w-full h-full transition-colors ${ isActive ? 'text-primary-600 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400'}`}>
-                <Icon className="w-6 h-6" />
-                <span className="text-xs mt-1 font-medium">{item.label}</span>
-              </NavLink>
-            );
-          })}
-        </div>
-      </nav>
-
-      
-    </div>
-  );
+    );
 };
 
 export default Layout;
