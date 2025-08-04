@@ -479,9 +479,7 @@ const Settings: React.FC = () => {
                             <p className="text-gray-600 dark:text-gray-400">{user?.email}</p>
                         </div>
                     </div>
-                    <button onClick={() => setShowEditProfile(true)} className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto">
-                        <Edit2 className="w-4 h-4" /> Editar Perfil
-                    </button>
+                    
                 </div>
             </div>
 
