@@ -27,34 +27,83 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // 🔧 Novo estado para controlar se já verificamos a sessão inicial
+  const [hasInitializedSession, setHasInitializedSession] = useState(false);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    let isMounted = true; // Flag para evitar state updates em componente desmontado
+
+    // 🔧 Função para buscar sessão inicial
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (!isMounted) return; // Componente foi desmontado, não atualizar state
+        
+        if (error) {
+          console.error('Erro ao buscar sessão:', error);
+          setSupabaseUser(null);
+        } else {
+          setSupabaseUser(session?.user ?? null);
+        }
+        
+        setHasInitializedSession(true);
+      } catch (error) {
+        console.error('Erro na inicialização da auth:', error);
+        if (isMounted) {
+          setSupabaseUser(null);
+          setHasInitializedSession(true);
+        }
+      }
+    };
+
+    // 🔧 Configurar listener de mudanças de auth
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+      
+      console.log('Auth state changed:', event, session?.user?.id);
       setSupabaseUser(session?.user ?? null);
+      
+      // Se ainda não inicializamos, marcar como inicializado
+      if (!hasInitializedSession) {
+        setHasInitializedSession(true);
+      }
     });
-    
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSupabaseUser(session?.user ?? null);
-    });
+
+    // Inicializar autenticação
+    initializeAuth();
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [hasInitializedSession]);
 
+  // 🔧 Effect separado para buscar dados do usuário
   useEffect(() => {
-    if (!supabaseUser) {
-      setUser(null);
-      setIsLoading(false);
-      return;
-    }
+    let isMounted = true;
 
-    supabase
-      .from('perfis')
-      .select('nome_completo')
-      .eq('id', supabaseUser.id)
-      .single()
-      .then(({ data: profile, error }) => {
+    const fetchUserProfile = async () => {
+      if (!supabaseUser) {
+        if (isMounted) {
+          setUser(null);
+          // 🔧 Só definir isLoading como false se já inicializamos a sessão
+          if (hasInitializedSession) {
+            setIsLoading(false);
+          }
+        }
+        return;
+      }
+
+      try {
+        const { data: profile, error } = await supabase
+          .from('perfis')
+          .select('nome_completo')
+          .eq('id', supabaseUser.id)
+          .single();
+
+        if (!isMounted) return;
+
         if (error) {
           console.error("Erro ao buscar perfil:", error);
           setUser(null);
@@ -68,37 +117,77 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           };
           setUser(appUser);
         }
-        setIsLoading(false);
-      });
-  }, [supabaseUser]);
+      } catch (error) {
+        console.error('Erro ao buscar perfil do usuário:', error);
+        if (isMounted) {
+          setUser(null);
+        }
+      } finally {
+        if (isMounted && hasInitializedSession) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    // 🔧 Só buscar perfil se já inicializamos a sessão
+    if (hasInitializedSession) {
+      fetchUserProfile();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [supabaseUser, hasInitializedSession]);
 
   const login = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { success: !error, error: error?.message };
+    try {
+      setIsLoading(true); // Mostrar loading durante login
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      return { success: !error, error: error?.message };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    } finally {
+      // isLoading será definido como false pelo useEffect quando os dados chegarem
+    }
   };
 
   const register = async (name: string, email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password, options: { data: { nome_completo: name } } });
-    return { success: !error, error: error?.message };
+    try {
+      setIsLoading(true); // Mostrar loading durante registro
+      const { error } = await supabase.auth.signUp({ 
+        email, 
+        password, 
+        options: { data: { nome_completo: name } } 
+      });
+      return { success: !error, error: error?.message };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    } finally {
+      // isLoading será definido como false pelo useEffect quando os dados chegarem
+    }
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSupabaseUser(null);
+    try {
+      setIsLoading(true);
+      await supabase.auth.signOut();
+      setUser(null);
+      setSupabaseUser(null);
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // 👇 FUNÇÃO ATUALIZADA COM MAIS LOGS PARA DEBUG 👇
   const resetAccountData = async () => {
     console.log('[AuthContext] Iniciando chamada RPC para "reset_user_data"...');
     try {
-      // Chama a função que criamos no SQL
       const { error } = await supabase.rpc('reset_user_data');
   
-      // Se o Supabase retornar um objeto de erro, NÓS VAMOS VER AGORA
       if (error) {
         console.error('[AuthContext] ERRO EXPLÍCITO retornado pela chamada RPC:', error);
-        throw error; // Lança o erro para que a função que chamou saiba que falhou.
+        throw error;
       }
   
       console.log('[AuthContext] Função RPC "reset_user_data" executada COM SUCESSO no servidor.');
