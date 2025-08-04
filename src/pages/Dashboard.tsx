@@ -5,7 +5,7 @@ import { format, subMonths, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
     TrendingUp, TrendingDown, Wallet, Target, ArrowUpRight, ArrowDownRight,
-    Loader2, Plus, CheckCircle, Trash2, X
+    Loader2, Plus, CheckCircle, Trash2, X, AlertCircle
 } from 'lucide-react';
 import { Goal } from '../types';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -66,30 +66,46 @@ const Dashboard: React.FC = () => {
     const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
     const [newGoalName, setNewGoalName] = useState('');
     const [newGoalAmount, setNewGoalAmount] = useState<string | undefined>('');
-    const [newGoalDate, setNewGoalDate] = useState(format(new Date(), 'yyyy-MM-dd')); // NOVO ESTADO
+    const [newGoalDate, setNewGoalDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [fundsToAdd, setFundsToAdd] = useState<string | undefined>('');
+    const [formError, setFormError] = useState<string | null>(null);
     
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [goalToDelete, setGoalToDelete] = useState<string | null>(null);
 
+    const resetGoalForm = () => {
+        setNewGoalName('');
+        setNewGoalAmount('');
+        setNewGoalDate(format(new Date(), 'yyyy-MM-dd'));
+        setFormError(null);
+        setAddGoalModalOpen(false);
+    };
+
     const handleOpenAddFundsModal = (goal: Goal) => {
         setSelectedGoal(goal);
         setAddFundsModalOpen(true);
+        setFormError(null);
     };
     
     const handleAddGoal = async (e: React.FormEvent) => {
         e.preventDefault();
         const amount = parseFloat((newGoalAmount || '0').replace(/\./g, '').replace(',', '.'));
-        if (newGoalName && amount > 0) {
+        
+        if (!newGoalName.trim() || amount <= 0) {
+            setFormError("Nome e valor da meta são obrigatórios.");
+            return;
+        }
+
+        try {
             await addGoal({ 
                 name: newGoalName, 
                 targetAmount: amount,
-                targetDate: newGoalDate // Adiciona a data
+                targetDate: newGoalDate
             });
-            setNewGoalName('');
-            setNewGoalAmount('');
-            setNewGoalDate(format(new Date(), 'yyyy-MM-dd')); // Redefine a data
-            setAddGoalModalOpen(false);
+            resetGoalForm();
+        } catch (error: any) {
+            console.error("Erro ao adicionar meta:", error);
+            setFormError(error.message || "Não foi possível salvar a meta.");
         }
     };
     
@@ -97,11 +113,16 @@ const Dashboard: React.FC = () => {
         e.preventDefault();
         const amount = parseFloat((fundsToAdd || '0').replace(/\./g, '').replace(',', '.'));
         if (selectedGoal && amount > 0) {
-            const newCurrentAmount = selectedGoal.currentAmount + amount;
-            await updateGoal(selectedGoal.id, { currentAmount: newCurrentAmount });
-            setFundsToAdd('');
-            setAddFundsModalOpen(false);
-            setSelectedGoal(null);
+            try {
+                const newCurrentAmount = selectedGoal.currentAmount + amount;
+                await updateGoal(selectedGoal.id, { currentAmount: newCurrentAmount });
+                setFundsToAdd('');
+                setAddFundsModalOpen(false);
+                setSelectedGoal(null);
+            } catch (error: any) {
+                console.error("Erro ao adicionar fundos:", error);
+                setFormError(error.message || "Não foi possível adicionar valor à meta.");
+            }
         }
     };
 
@@ -112,9 +133,14 @@ const Dashboard: React.FC = () => {
 
     const confirmDeleteGoal = async () => {
         if (goalToDelete) {
-            await deleteGoal(goalToDelete);
-            setGoalToDelete(null);
-            setShowDeleteConfirm(false);
+            try {
+                await deleteGoal(goalToDelete);
+            } catch(error: any) {
+                console.error("Erro ao deletar meta:", error);
+            } finally {
+                setGoalToDelete(null);
+                setShowDeleteConfirm(false);
+            }
         }
     };
 
@@ -136,8 +162,8 @@ const Dashboard: React.FC = () => {
         const name = format(d, 'MMM', { locale: ptBR });
         return {
             month: name,
-            receitas: transactions.filter(t => t.type === 'income' && t.date.startsWith(key)).reduce((sum, t) => sum + t.amount, 0),
-            despesas: transactions.filter(t => t.type === 'expense' && t.date.startsWith(key)).reduce((sum, t) => sum + t.amount, 0),
+            receitas: transactions.filter(t => t.date && t.type === 'income' && t.date.startsWith(key)).reduce((sum, t) => sum + t.amount, 0),
+            despesas: transactions.filter(t => t.date && t.type === 'expense' && t.date.startsWith(key)).reduce((sum, t) => sum + t.amount, 0),
         }
     }).reverse();
     const recentTransactions = [...transactions].filter(t => t.date).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
@@ -287,8 +313,9 @@ const Dashboard: React.FC = () => {
                         <form onSubmit={handleAddGoal} className="p-6 space-y-4">
                              <div className="flex items-center justify-between">
                                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Criar Nova Meta</h2>
-                                 <button type="button" onClick={() => setAddGoalModalOpen(false)} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><X/></button>
+                                 <button type="button" onClick={resetGoalForm} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><X/></button>
                              </div>
+                             {formError && <div className="p-3 bg-red-100 text-red-700 rounded-md flex items-center gap-2 text-sm"><AlertCircle size={16} /><span>{formError}</span></div>}
                             <div>
                                 <label className="label-form">Nome da Meta</label>
                                 <input type="text" value={newGoalName} onChange={e => setNewGoalName(e.target.value)} className="input-field" placeholder="Ex: Viagem para a praia" required />
@@ -296,16 +323,9 @@ const Dashboard: React.FC = () => {
                             <div>
                                 <label className="label-form">Valor Alvo (R$)</label>
                                 <CurrencyInput
-                                    id="new-goal-amount"
-                                    name="new-goal-amount"
-                                    className="input-field"
-                                    placeholder="R$ 5.000,00"
-                                    value={newGoalAmount}
-                                    onValueChange={(value) => setNewGoalAmount(value)}
-                                    prefix="R$ "
-                                    groupSeparator="."
-                                    decimalSeparator=","
-                                    decimalsLimit={2}
+                                    id="new-goal-amount" name="new-goal-amount" className="input-field" placeholder="R$ 5.000,00"
+                                    value={newGoalAmount} onValueChange={(value) => setNewGoalAmount(value)}
+                                    prefix="R$ " groupSeparator="." decimalSeparator="," decimalsLimit={2}
                                     required
                                 />
                             </div>
@@ -314,7 +334,7 @@ const Dashboard: React.FC = () => {
                                 <input type="date" value={newGoalDate} onChange={e => setNewGoalDate(e.target.value)} className="input-field" required />
                             </div>
                             <div className="flex justify-end gap-3 pt-4">
-                                <button type="button" onClick={() => setAddGoalModalOpen(false)} className="btn-secondary">Cancelar</button>
+                                <button type="button" onClick={resetGoalForm} className="btn-secondary">Cancelar</button>
                                 <button type="submit" className="btn-primary">Salvar Meta</button>
                             </div>
                         </form>
@@ -327,24 +347,17 @@ const Dashboard: React.FC = () => {
                          <form onSubmit={handleAddFunds} className="p-6 space-y-4">
                              <div className="flex items-center justify-between">
                                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Adicionar Valor</h2>
-                                 <button type="button" onClick={() => setAddFundsModalOpen(false)} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><X/></button>
+                                 <button type="button" onClick={() => { setAddFundsModalOpen(false); setFormError(null); }} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><X/></button>
                              </div>
+                             {formError && <div className="p-3 bg-red-100 text-red-700 rounded-md flex items-center gap-2 text-sm"><AlertCircle size={16} /><span>{formError}</span></div>}
                              <p className="text-gray-700 dark:text-gray-300">Meta: <span className="font-semibold">{selectedGoal.name}</span></p>
                              <div>
                                  <label className="label-form">Valor a Adicionar (R$)</label>
                                  <CurrencyInput
-                                     id="funds-to-add"
-                                     name="funds-to-add"
-                                     className="input-field"
-                                     placeholder="R$ 100,00"
-                                     value={fundsToAdd}
-                                     onValueChange={(value) => setFundsToAdd(value)}
-                                     prefix="R$ "
-                                     groupSeparator="."
-                                     decimalSeparator=","
-                                     decimalsLimit={2}
-                                     required
-                                     autoFocus
+                                     id="funds-to-add" name="funds-to-add" className="input-field" placeholder="R$ 100,00"
+                                     value={fundsToAdd} onValueChange={(value) => setFundsToAdd(value)}
+                                     prefix="R$ " groupSeparator="." decimalSeparator="," decimalsLimit={2}
+                                     required autoFocus
                                  />
                              </div>
                               <div className="flex justify-end gap-3 pt-4">
